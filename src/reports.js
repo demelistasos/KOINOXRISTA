@@ -59,9 +59,9 @@
       .addr{font-size:8.5pt;margin-top:1px}
       .oil{margin:7px 0 10px;font-size:8.3pt}
       table.main{font-size:7.8pt}
-      .main th{font-weight:700;font-size:7.2pt;padding:3px 3px 4px;text-align:center;vertical-align:bottom;border-bottom:1px solid #000;line-height:1.2}
+      .main th{font-weight:700;font-size:7.2pt;padding:3px 4px 4px;text-align:right;vertical-align:bottom;border-bottom:1px solid #000;line-height:1.2}
       .main th.l,.main td.l{text-align:left}
-      .main td{padding:3px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:.5px solid #bbb}
+      .main td{padding:3px 4px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:.5px solid #bbb}
       .main td.l{max-width:60mm;overflow:hidden;text-overflow:ellipsis}
       .main .b{font-weight:700}
       .main tfoot td{font-weight:700;border-top:1px solid #000;border-bottom:0;padding-top:4px}
@@ -216,7 +216,7 @@
       .apts{display:grid;gap:10px;margin-top:12px;align-items:start}
       .apts.n2{grid-template-columns:1fr 1fr}
       .apts.n3{grid-template-columns:1fr 1fr 1fr}
-      .apts .ch{font-size:8pt}.apts .ch td{padding:2px 3px}
+      .apts .ch{font-size:8pt}.apts .ch td,.apts .ch th{padding:2px 3px}
       .apts .sub{font-size:7.4pt}
       .cols2{display:grid;grid-template-columns:1fr 58mm;gap:16px;align-items:start}
       .cols2 .side{margin-top:14px}
