@@ -96,6 +96,9 @@
   }
 
   // ---------------- Ειδοποιητήρια (A4 όρθιο, ένα ανά διαμέρισμα) ----------------
+  // Κλειδί ενοίκου: ίδιο όνομα (χωρίς τόνους, κεφαλαία/μικρά, κενά) = ίδιος ένοικος.
+  const ownerKey = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').replace(/\s*\.\s*/g, '.').trim();
+
   function receipts(building, period, comp, opts) {
     opts = opts || {};
     const { results, totals: t, oil } = comp;
@@ -104,44 +107,67 @@
     const only = opts.onlyId ? results.filter((r) => r.id === opts.onlyId) : results;
     const analysis = expenseList(t, oil).map(([l, v]) => `<div class="kv"><span>${esc(l)}:</span><b class="num">${e(v)}</b></div>`).join('');
 
-    const pages = only.map((r) => {
+    // Διαμερίσματα με το ίδιο όνομα ενοίκου ανήκουν στον ίδιο ένοικο: ένα ειδοποιητήριο (ένα χαρτί) για όλα μαζί.
+    const groups = [];
+    const byKey = {};
+    only.forEach((r) => {
+      const k = ownerKey(r.apt.owner) || 'id:' + r.id;
+      if (!byKey[k]) { byKey[k] = { key: k, owner: r.apt.owner, list: [] }; groups.push(byKey[k]); }
+      byKey[k].list.push(r);
+    });
+    // Ανάλυση ανά ένοικο (όλη η πολυκατοικία), για διαφάνεια.
+    const allGroups = [];
+    const allByKey = {};
+    results.forEach((r) => {
+      const k = ownerKey(r.apt.owner) || 'id:' + r.id;
+      if (!allByKey[k]) { allByKey[k] = { key: k, owner: r.apt.owner, codes: [], heating: 0, elevator: 0, general: 0, charges: 0 }; allGroups.push(allByKey[k]); }
+      const g = allByKey[k];
+      g.codes.push(r.apt.code); g.heating += r.heating; g.elevator += r.elevator; g.general += r.general; g.charges += r.charges;
+    });
+
+    const aptBox = (r) => {
       const items = [];
       if (r.prevBalance !== 0) items.push([r.prevBalance > 0 ? 'Προηγούμενη οφειλή' : 'Πιστωτικό υπόλοιπο', r.prevBalance]);
       C.EXPENSES.forEach((x) => { if (r.breakdown[x.key] > 0) items.push([x.label, r.breakdown[x.key]]); });
       if (oil.costCents > 0 && !r.apt.noHeating) { items.push(['Πάγιο θέρμανσης', r.heatingFixed]); items.push(['Χρήση θέρμανσης', r.heatingVariable]); }
       if (t.expenses.elevator > 0 && !r.apt.noElevator) items.push(['Ασανσέρ', r.elevator]);
       const body = items.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="num">${m(v)}</td></tr>`).join('');
+      return `<div class="apt">
+        <div class="ah">ΔΙΑΜΕΡΙΣΜΑ: ${esc(r.apt.code)} (${esc(C.floorLabel(r.apt.floor))})</div>
+        <div class="sub">Χιλ.: ${f0(r.mils)} | Χιλ. Ασανσέρ: ${f0(r.elevMils)}</div>
+        <div class="sub">Παλαιά: ${f2(r.prevUnits)} | Νέα: ${r.currUnits === null ? '—' : f2(r.currUnits)} | Χρήση: ${f2(r.units)}</div>
+        <table class="ch"><thead><tr><th class="l">ΠΕΡΙΓΡΑΦΗ</th><th>ΠΟΣΟ</th></tr></thead>
+          <tbody>${body || '<tr><td colspan="2" class="muted">Καμία χρέωση.</td></tr>'}</tbody>
+          <tfoot><tr><td>Σύνολο:</td><td class="num">${e(r.total)}</td></tr></tfoot></table>
+      </div>`;
+    };
+    const side = `<div class="side"><h3>ΑΝΑΛΥΣΗ ΕΞΟΔΩΝ ΠΟΛ/ΚΙΑΣ</h3>${analysis || '<span class="muted">—</span>'}</div>`;
 
-      const overview = showOverview ? `<div class="ov"><h3>ΤΙ ΠΛΗΡΩΝΕΙ ΚΑΘΕ ΔΙΑΜΕΡΙΣΜΑ</h3><table>
-        <thead><tr><th class="l">Διαμ.</th><th class="l">Ένοικος</th><th>Θέρμ.</th><th>Ασαν.</th><th>Κοιν.</th><th>Σύνολο</th></tr></thead>
-        <tbody>${results.map((x) => `<tr${x.id === r.id ? ' class="me"' : ''}><td>${esc(x.apt.code)}</td><td class="own">${esc(x.apt.owner)}</td><td class="num">${m(x.heating)}</td><td class="num">${m(x.elevator)}</td><td class="num">${m(x.general)}</td><td class="num">${m(x.charges)}</td></tr>`).join('')}</tbody>
+    const pages = groups.map((g) => {
+      const grand = g.list.reduce((a, r) => a + r.total, 0);
+      const multi = g.list.length > 1;
+      const overview = showOverview ? `<div class="ov"><h3>ΑΝΑΛΥΣΗ ΑΝΑ ΕΝΟΙΚΟ</h3><table>
+        <thead><tr><th class="l">Ένοικος</th><th class="l">Διαμ.</th><th>Θέρμ.</th><th>Ασαν.</th><th>Κοιν.</th><th>Σύνολο</th></tr></thead>
+        <tbody>${allGroups.map((x) => `<tr${x.key === g.key ? ' class="me"' : ''}><td class="own">${esc(x.owner || '—')}</td><td class="codes">${esc(x.codes.join(', '))}</td><td class="num">${m(x.heating)}</td><td class="num">${m(x.elevator)}</td><td class="num">${m(x.general)}</td><td class="num">${m(x.charges)}</td></tr>`).join('')}</tbody>
         <tfoot><tr><td colspan="2">Σύνολο</td><td class="num">${m(t.heating)}</td><td class="num">${m(t.elevator)}</td><td class="num">${m(t.general)}</td><td class="num">${m(t.charges)}</td></tr></tfoot>
       </table><div class="ovnote">Τα ποσά είναι τα έξοδα του μήνα, χωρίς προηγούμενες οφειλές.</div></div>` : '';
 
       return `<section class="page">
         <h1>ΕΙΔΟΠΟΙΗΤΗΡΙΟ ΚΟΙΝΟΧΡΗΣΤΩΝ: ${esc(building.name)}</h1>
         <div class="meta">Περίοδος: ${esc(C.periodLabel(period))}${building.address ? ' · ' + esc(building.address) : ''}</div>
-        <div class="owner">Υπόχρεος: ${esc(up(r.apt.owner || '—'))}</div>
+        <div class="owner">Υπόχρεος: ${esc(up(g.owner || '—'))}${multi ? ` <span class="cnt">(${g.list.length} διαμερίσματα: ${esc(g.list.map((r) => r.apt.code).join(', '))})</span>` : ''}</div>
         <div class="oil">
           <div class="cap">ΣΤΟΙΧΕΙΑ ΠΕΤΡΕΛΑΙΟΥ ΠΟΛΥΚΑΤΟΙΚΙΑΣ</div>
           <div>Αρχή: ${f2(oil.startL)} lt | Αγορές: ${purchasesText(oil)} lt | Τέλος: ${oil.endL === null ? '—' : f2(oil.endL) + ' lt'} | Μέση τιμή: ${f3(oil.avgPrice)} €/lt</div>
           <div><b>Συνολική κατανάλωση: ${f2(oil.consumedL)} lt</b></div>
         </div>
-        <div class="cols">
-          <div class="apt">
-            <div class="ah">ΔΙΑΜΕΡΙΣΜΑ: ${esc(r.apt.code)} (${esc(C.floorLabel(r.apt.floor))})</div>
-            <div class="sub">Χιλ.: ${f0(r.mils)} | Χιλ. Ασανσέρ: ${f0(r.elevMils)}</div>
-            <div class="sub">Παλαιά ένδειξη: ${f2(r.prevUnits)} | Νέα ένδειξη: ${r.currUnits === null ? '—' : f2(r.currUnits)} | Χρήση: ${f2(r.units)}</div>
-            <table class="ch"><thead><tr><th class="l">ΠΕΡΙΓΡΑΦΗ</th><th>ΠΟΣΟ</th></tr></thead>
-              <tbody>${body || '<tr><td colspan="2" class="muted">Καμία χρέωση.</td></tr>'}</tbody>
-              <tfoot><tr><td>Σύνολο:</td><td class="num">${e(r.total)}</td></tr></tfoot></table>
-          </div>
-          <div class="side"><h3>ΑΝΑΛΥΣΗ ΕΞΟΔΩΝ ΠΟΛ/ΚΙΑΣ</h3>${analysis || '<span class="muted">—</span>'}</div>
-        </div>
-        ${overview}
+        ${multi
+          ? `<div class="apts n${Math.min(g.list.length, 3)}">${g.list.map(aptBox).join('')}</div>
+             <div class="cols2">${overview || '<div></div>'}${side}</div>`
+          : `<div class="cols">${aptBox(g.list[0])}${side}</div>${overview}`}
         <div class="pay">
-          ${note ? `<div class="note">${esc(note)}</div>` : ''}
-          <div class="amt"><span>ΣΥΝΟΛΙΚΟ ΠΟΣΟ ΠΡΟΣ ΕΞΟΦΛΗΣΗ:</span><b class="num">${e(r.total)}</b></div>
+          ${note ? `<div class="note"><span class="warn">⚠</span> ${esc(note)}</div>` : ''}
+          <div class="amt"><span>ΣΥΝΟΛΙΚΟ ΠΟΣΟ ΠΡΟΣ ΕΞΟΦΛΗΣΗ:</span><b class="num">${e(grand)}</b></div>
         </div>
       </section>`;
     }).join('');
@@ -171,13 +197,23 @@
       .ov table{font-size:7.4pt}
       .ov th{text-align:right;font-weight:700;border-bottom:.75px solid #000;padding:1.5px 4px}.ov th.l{text-align:left}
       .ov td{padding:1.5px 4px;border-bottom:.5px solid #ddd}
-      .ov td.own{max-width:70mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .ov td.own{max-width:62mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .ov tr.me td{font-weight:700}
       .ov tr.me td:first-child::before{content:"► ";font-size:6pt}
       .ov tfoot td{font-weight:700;border-top:.75px solid #000;border-bottom:0}
       .ovnote{font-size:6.8pt;color:#555;margin-top:2px}
       .pay{margin-top:14px;border:.75px solid #000;padding:8px 12px}
-      .note{font-size:8.5pt;font-weight:700;margin-bottom:6px}
+      .note{font-size:9pt;font-weight:700;margin-bottom:6px;color:#c40000}
+      .note .warn{font-size:12pt;line-height:1;vertical-align:-1px}
+      .cnt{font-weight:400;font-size:9pt}
+      .apts{display:grid;gap:10px;margin-top:12px;align-items:start}
+      .apts.n2{grid-template-columns:1fr 1fr}
+      .apts.n3{grid-template-columns:1fr 1fr 1fr}
+      .apts .ch{font-size:8pt}.apts .ch td{padding:2px 3px}
+      .apts .sub{font-size:7.4pt}
+      .cols2{display:grid;grid-template-columns:1fr 58mm;gap:16px;align-items:start}
+      .cols2 .side{margin-top:14px}
+      .ov td.codes{white-space:nowrap}
       .amt{display:flex;justify-content:space-between;align-items:baseline;gap:16px}
       .amt span{font-size:11pt;font-weight:700}
       .amt b{font-size:15pt}

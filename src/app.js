@@ -506,7 +506,7 @@
       </div></section>
       <section class="card"><div class="card-h"><h2>Ειδοποιητήρια</h2></div><div class="card-b" style="display:grid;gap:14px">
         <label class="field"><span>Σημείωση προς τους ενοίκους</span><textarea class="inp" data-root="b" data-path="note" rows="2">${esc(b.note || '')}</textarea></label>
-        <label class="check"><input type="checkbox" data-root="b" data-path="receiptOverview" ${b.receiptOverview !== false ? 'checked' : ''}>Να εμφανίζεται ο πίνακας όλων των διαμερισμάτων στο κάθε ειδοποιητήριο</label>
+        <label class="check"><input type="checkbox" data-root="b" data-path="receiptOverview" ${b.receiptOverview !== false ? 'checked' : ''}>Να εμφανίζεται η «Ανάλυση ανά ένοικο» σε κάθε ειδοποιητήριο (διαμερίσματα με το ίδιο όνομα ενοίκου βγαίνουν μαζί σε ένα χαρτί)</label>
       </div></section>
       <section class="card danger-zone"><div class="card-h"><h2>Διαγραφή</h2></div><div class="card-b" style="display:flex;justify-content:space-between;align-items:center;gap:16px">
         <span style="color:var(--ink-2)">Διαγράφει την πολυκατοικία, τα διαμερίσματα και όλο το ιστορικό της.</span>
