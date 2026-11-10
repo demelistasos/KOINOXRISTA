@@ -133,21 +133,25 @@
     });
 
     const aptBox = (r) => {
+      // Πρώτα μόνο τα έξοδα του μήνα και το «Σύνολο μήνα». Οφειλές/πιστώσεις χωριστά από κάτω.
       const items = [];
-      if (r.prevBalance !== 0) items.push([r.prevBalance > 0 ? 'Προηγούμενη οφειλή' : 'Πιστωτικό υπόλοιπο', r.prevBalance]);
-      if (r.adjust) items.push([(r.adjust > 0 ? 'Διόρθωση' : 'Πίστωση') + (r.adjustNote ? ': ' + r.adjustNote : ''), r.adjust]);
       C.EXPENSES.forEach((x) => { if (r.breakdown[x.key] > 0) items.push([x.label, r.breakdown[x.key]]); });
       if (r.heatingFixed > 0) items.push(['Πάγιο θέρμανσης', r.heatingFixed]);
       if (r.heatingVariable > 0) items.push(['Χρήση θέρμανσης', r.heatingVariable]);
       if (r.elevator > 0) items.push(['Ασανσέρ', r.elevator]);
       const body = items.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="num">${m(v)}</td></tr>`).join('');
+      const extra = [];
+      if (r.prevBalance !== 0) extra.push([r.prevBalance > 0 ? 'Προηγούμενη οφειλή' : 'Πιστωτικό υπόλοιπο', r.prevBalance]);
+      if (r.adjust) extra.push([(r.adjust > 0 ? 'Διόρθωση' : 'Πίστωση') + (r.adjustNote ? ' (' + r.adjustNote + ')' : ''), r.adjust]);
+      const bal = extra.length ? `<tbody class="bal">${extra.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="num">${m(v)}</td></tr>`).join('')}
+          <tr class="fin"><td>${r.total < 0 ? 'Απομένει πίστωση:' : 'Πληρωτέο:'}</td><td class="num">${e(Math.abs(r.total))}</td></tr></tbody>` : '';
       return `<div class="apt">
         <div class="ah">ΔΙΑΜΕΡΙΣΜΑ: ${esc(r.apt.code)} (${esc(C.floorLabel(r.apt.floor))})</div>
         <div class="sub">Χιλ.: ${f0(r.mils)}${t.elevator > 0 && r.elevator > 0 ? ` | Χιλ. Ασανσέρ: ${f0(r.elevMils)}` : ''}</div>
         ${oil.costCents > 0 ? `<div class="sub">Παλαιά: ${f2(r.prevUnits)} | Νέα: ${r.currUnits === null ? '—' : f2(r.currUnits)} | Χρήση: ${f2(r.units)}</div>` : ''}
         <table class="ch"><thead><tr><th class="l">ΠΕΡΙΓΡΑΦΗ</th><th>ΠΟΣΟ</th></tr></thead>
           <tbody>${body || '<tr><td colspan="2" class="muted">Καμία χρέωση.</td></tr>'}</tbody>
-          <tfoot><tr><td>Σύνολο:</td><td class="num">${e(r.total)}</td></tr></tfoot></table>
+          <tbody class="sum"><tr><td>Σύνολο μήνα:</td><td class="num">${e(r.charges)}</td></tr></tbody>${bal}</table>
       </div>`;
     };
     const side = `<div class="side"><h3>ΑΝΑΛΥΣΗ ΕΞΟΔΩΝ ΠΟΛ/ΚΙΑΣ</h3>${analysis || '<span class="muted">—</span>'}</div>`;
@@ -197,6 +201,10 @@
       .ch th{font-size:7.3pt;font-weight:700;text-align:right;border-bottom:.75px solid #000;padding:2px 4px}
       .ch th.l{text-align:left}
       .ch td{padding:2.5px 4px;border-bottom:.5px dotted #aaa}
+      .ch .sum td{font-weight:700;font-size:9.5pt;border-top:.75px solid #000;border-bottom:0;padding-top:5px}
+      .ch .bal td{border-bottom:0;padding-top:3px}
+      .ch .bal tr:first-child td{padding-top:8px}
+      .ch .fin td{font-weight:700;font-size:9.5pt;border-top:.5px solid #000;padding-top:4px}
       .ch tfoot td{font-weight:700;font-size:9.5pt;border-top:.75px solid #000;border-bottom:0;padding-top:5px}
       .side{font-size:8pt;padding-top:2px}
       .side h3{font-size:8.3pt;font-weight:700;text-decoration:underline;margin-bottom:5px}
