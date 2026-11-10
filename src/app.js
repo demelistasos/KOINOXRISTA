@@ -22,6 +22,19 @@
   let saveTimer = null;
   let lastSaved = null;
   let pdfDefault = '';
+  let backupDefault = '';
+
+  // Αυτόματο αντίγραφο ασφαλείας (στο κλείσιμο μήνα, μία φορά τη μέρα, πριν από επαναφορά).
+  async function autoBackup(reason) {
+    if (!api || !api.autoBackup || !data || !data.buildings.length) return null;
+    try {
+      const f = await api.autoBackup(data, reason, data.prefs.backupDir || backupDefault);
+      data.prefs.lastBackup = new Date().toISOString();
+      data.prefs.lastBackupFile = f;
+      scheduleSave();
+      return f;
+    } catch (err) { toast('Δεν έγινε αντίγραφο ασφαλείας: ' + err.message); return null; }
+  }
 
   function scheduleSave() {
     clearTimeout(saveTimer);
@@ -327,7 +340,7 @@
       const cell = (k, ph = '') => `<td><input class="inp n" inputmode="decimal" data-root="p" data-path="rows.${a.id}.${k}" value="${esc(r[k] ?? '')}" placeholder="${ph}" ${dis ? 'disabled' : ''}></td>`;
       return `<tr>
         <td class="code">${esc(a.code)}</td><td class="owner" title="${esc(a.owner)}">${esc(a.owner)}</td><td class="muted">${esc(C.floorLabel(a.floor))}</td>
-        ${cell('prevUnits', '0')}${cell('currUnits', '—')}
+        ${a.meterWith && a.meterShared !== false && apts.some((x) => x.id === a.meterWith) ? `<td colspan="2" class="shared">κοινός με ${esc((apts.find((x) => x.id === a.meterWith) || {}).code || '')} · ÷${apts.filter((x) => x.meterWith === a.meterWith && x.meterShared !== false).length + 1}</td>` : cell('prevUnits', '0') + cell('currUnits', '—')}
         <td class="r" data-out="r:${a.id}:units"></td>
         ${dis || derivedIds.has(a.id) ? `<td class="r" data-out="r:${a.id}:prevBalance"></td>` : cell('prevBalance', '0,00')}
         ${dis ? `<td class="r" data-out="r:${a.id}:adjust" title="${esc(r.adjustNote || '')}"></td>` : `<td class="adj"><input class="inp n" inputmode="decimal" data-root="p" data-path="rows.${a.id}.adjust" value="${esc(r.adjust ?? '')}" placeholder="0,00" aria-label="Διόρθωση οφειλής"><input class="inp note" data-root="p" data-path="rows.${a.id}.adjustNote" value="${esc(r.adjustNote ?? '')}" placeholder="αιτία" aria-label="Αιτία διόρθωσης"></td>`}
@@ -446,24 +459,27 @@
       <td class="grip-cell"><span class="grip" title="Σύρε για να αλλάξεις θέση" aria-hidden="true">⋮⋮</span><span class="mv">
         <button class="icon-btn mini-btn" data-act="move-apt" data-id="${a.id}" data-dir="-1" aria-label="Μετακίνηση πάνω" ${i === 0 ? 'disabled' : ''}>${I.chevUp}</button>
         <button class="icon-btn mini-btn" data-act="move-apt" data-id="${a.id}" data-dir="1" aria-label="Μετακίνηση κάτω" ${i === apts.length - 1 ? 'disabled' : ''}>${I.chevDown}</button></span></td>
-      <td><input class="inp" data-root="a" data-path="${a.id}.code" value="${esc(a.code)}" placeholder="Α1" style="min-width:64px;width:80px"></td>
-      <td><input class="inp" data-root="a" data-path="${a.id}.owner" value="${esc(a.owner)}" placeholder="Ονοματεπώνυμο" style="min-width:160px"></td>
+      <td><input class="inp" data-root="a" data-path="${a.id}.code" value="${esc(a.code)}" placeholder="Α1" style="min-width:0;width:58px"></td>
+      <td><input class="inp" data-root="a" data-path="${a.id}.owner" value="${esc(a.owner)}" placeholder="Ονοματεπώνυμο" style="min-width:130px"></td>
       <td><input class="inp n" inputmode="numeric" data-root="a" data-path="${a.id}.floor" value="${esc(a.floor)}" style="width:70px;min-width:0"></td>
-      <td><input class="inp n" inputmode="decimal" data-root="a" data-path="${a.id}.sqm" value="${esc(a.sqm)}" placeholder="0" style="width:90px"></td>
+      <td><input class="inp n" inputmode="decimal" data-root="a" data-path="${a.id}.sqm" value="${esc(a.sqm)}" placeholder="0" style="width:80px;min-width:0"></td>
       <td class="r" data-out="a:${a.id}:mils"></td>
       <td class="r muted" data-out="a:${a.id}:factor"></td>
       <td class="r" data-out="a:${a.id}:elevMils"></td>
       <td style="text-align:center"><input type="checkbox" class="chk" data-root="a" data-path="${a.id}.noHeating" ${a.noHeating ? 'checked' : ''} aria-label="Εξαιρείται από θέρμανση"></td>
       <td style="text-align:center"><input type="checkbox" class="chk" data-root="a" data-path="${a.id}.noElevator" ${a.noElevator ? 'checked' : ''} aria-label="Εξαιρείται από ασανσέρ"></td>
+      <td class="meter-cell"><label class="switch" title="Κοινός θερμιδομετρητής με άλλο διαμέρισμα"><input type="checkbox" data-root="a" data-path="${a.id}.meterShared" data-rerender ${a.meterWith && a.meterShared !== false ? 'checked' : ''} ${apts.some((x) => x.meterWith === a.id && x.meterShared !== false) ? 'disabled' : ''} aria-label="Κοινός μετρητής"><i></i></label>
+        <select class="inp meter-sel" data-root="a" data-path="${a.id}.meterWith" data-rerender aria-label="Με ποιο διαμέρισμα" ${a.meterWith && a.meterShared !== false ? '' : 'disabled'}>
+        <option value="">—</option>${apts.filter((x) => x.id !== a.id && !(x.meterWith && x.meterShared !== false)).map((x) => `<option value="${x.id}" ${a.meterWith === x.id ? 'selected' : ''}>με ${esc(x.code || '—')}</option>`).join('')}</select></td>
       <td><button class="icon-btn" data-act="del-apt" data-id="${a.id}" aria-label="Διαγραφή διαμερίσματος">${I.trash}</button></td>
     </tr>`).join('');
     return `<section class="card">
       <div class="card-h"><h2>Διαμερίσματα</h2><span class="hint">${custom ? `Δική σου σειρά · <button class="link" data-act="sort-floor">Ταξινόμηση κατά όροφο</button>` : 'Σύρε τις γραμμές από το ⋮⋮ για να τις βάλεις σε όποια σειρά θέλεις'}</span></div>
       <div class="card-b" style="padding-top:8px">
         ${apts.length ? `<div class="tbl-wrap"><table class="tbl apts" id="aptTable">
-          <thead><tr><th></th><th>Κωδικός</th><th>Ένοικος</th><th>Όροφος</th><th>τ.μ.</th><th class="r">Χιλιοστά</th><th class="r">Συντ. ασ.</th><th class="r">Χιλ. ασανσέρ</th><th style="text-align:center">Χωρίς θέρμ.</th><th style="text-align:center">Χωρίς ασ.</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Κωδικός</th><th>Ένοικος</th><th>Όροφος</th><th>τ.μ.</th><th class="r">Χιλιοστά</th><th class="r">Συντ. ασ.</th><th class="r">Χιλ. ασανσέρ</th><th style="text-align:center">Χωρίς θέρμ.</th><th style="text-align:center">Χωρίς ασ.</th><th title="Αν δύο ή περισσότερα διαμερίσματα έχουν κοινό θερμιδομετρητή, η χρήση μοιράζεται εξίσου">Κοινός μετρ.</th><th></th></tr></thead>
           <tbody>${rows}</tbody>
-          <tfoot><tr><td colspan="4">Σύνολα</td><td class="r" data-out="at:sqm"></td><td class="r" data-out="at:mils"></td><td></td><td class="r" data-out="at:elevMils"></td><td colspan="3"></td></tr></tfoot>
+          <tfoot><tr><td colspan="4">Σύνολα</td><td class="r" data-out="at:sqm"></td><td class="r" data-out="at:mils"></td><td></td><td class="r" data-out="at:elevMils"></td><td colspan="4"></td></tr></tfoot>
         </table></div>` : '<div class="empty"><b>Κανένα διαμέρισμα ακόμα</b>Ξεκίνα προσθέτοντας το πρώτο.</div>'}
         <button class="btn primary" data-act="add-apt" style="margin-top:14px">${I.plus}Νέο διαμέρισμα</button>
         <p class="hint" style="color:var(--ink-3);font-size:12.5px;margin:14px 0 0">Όροφος: 0 για ισόγειο, −1 για υπόγειο. Τα χιλιοστά υπολογίζονται από τα τετραγωνικά· οι συντελεστές ασανσέρ αλλάζουν από τις Ρυθμίσεις. Η σειρά των διαμερισμάτων ισχύει παντού: στους πίνακες, στις εισπράξεις και στα PDF.</p>
@@ -482,7 +498,10 @@
         <div class="actions"><button class="btn sm" data-act="open-period" data-id="${p.id}">Άνοιγμα</button><button class="btn sm ghost" data-act="pdf-statement" data-id="${p.id}">${I.table}</button><button class="btn sm ghost" data-act="pdf-receipts" data-id="${p.id}">${I.receipt}</button></div>
       </div>`;
     }).join('');
-    return `<section class="card"><div class="card-h"><h2>Ιστορικό μηνών</h2><span class="hint">${b.periods.length} μήνες</span></div><div style="padding-top:8px">${list}</div></section>`;
+    const years = [...new Set(b.periods.map((p) => p.year))].sort((x, y) => y - x);
+    return `<section class="card" style="margin-bottom:22px"><div class="card-h"><h2>Ετήσια κατάσταση ανά ένοικο</h2><span class="hint">Πιλοτικά · κοινόχρηστα, πληρωμές και υπόλοιπο κάθε ενοίκου</span></div>
+      <div class="card-b chips">${years.map((y) => `<button class="btn" data-act="annual" data-year="${y}">${I.table}${y}</button>`).join('')}</div></section>
+      <section class="card"><div class="card-h"><h2>Ιστορικό μηνών</h2><span class="hint">${b.periods.length} μήνες</span></div><div style="padding-top:8px">${list}</div></section>`;
   }
 
   // ---------- καρτέλα: ρυθμίσεις ----------
@@ -499,6 +518,13 @@
       <section class="card"><div class="card-h"><h2>Συντελεστές ανελκυστήρα</h2><button class="btn ghost sm" data-act="reset-factors">Επαναφορά προεπιλογών</button></div>
         <div class="card-b"><p style="margin:0 0 14px;color:var(--ink-2)">Τα χιλιοστά ασανσέρ = χιλιοστά × συντελεστής ορόφου, αναγμένα στα 1000. Άφησε κενό για την προεπιλογή (ισόγειο 0, 1ος 1,00 και +0,10 ανά όροφο).</p><div class="factors">${factors}</div></div></section>
       <section class="card"><div class="card-h"><h2>Επαναλαμβανόμενα έξοδα</h2></div><div class="card-b"><p style="margin:0 0 12px;color:var(--ink-2)">Όσα επιλέξεις μεταφέρονται με το ίδιο ποσό στον επόμενο μήνα κατά το κλείσιμο.</p><div class="chips">${chips}</div></div></section>
+      <section class="card"><div class="card-h"><h2>Αντίγραφα ασφαλείας</h2><span class="hint">Κοινά για όλες τις πολυκατοικίες</span></div><div class="card-b" style="display:grid;gap:12px">
+        ${api && api.autoBackup ? `<div class="folder"><code>${esc(data.prefs.backupDir || backupDefault)}</code>
+          <button class="btn sm" data-act="bk-folder">Αλλαγή…</button><button class="btn sm" data-act="bk-folder-open">Άνοιγμα</button>${data.prefs.backupDir ? '<button class="btn sm ghost" data-act="bk-folder-reset">Προεπιλογή</button>' : ''}</div>
+          <p style="margin:0;color:var(--ink-2)">Αντίγραφο γίνεται αυτόματα <b>σε κάθε κλείσιμο μήνα</b>, <b>μία φορά τη μέρα</b> και <b>πριν από κάθε επαναφορά</b>. Κρατιούνται τα 60 πιο πρόσφατα. Για να είναι ασφαλή αν χαλάσει ο υπολογιστής, διάλεξε φάκελο σε USB, OneDrive, iCloud ή Dropbox.</p>
+          <div class="folder" style="justify-content:space-between"><span style="color:var(--ink-3);font-size:12.5px">${data.prefs.lastBackup ? 'Τελευταίο αντίγραφο: ' + new Date(data.prefs.lastBackup).toLocaleString('el-GR', { dateStyle: 'medium', timeStyle: 'short' }) : 'Δεν έχει γίνει ακόμα αντίγραφο'}</span><button class="btn sm" data-act="bk-now">${I.down}Αντίγραφο τώρα</button></div>`
+        : '<p style="margin:0;color:var(--ink-2)">Διαθέσιμο στην εφαρμογή για υπολογιστή.</p>'}
+      </div></section>
       <section class="card"><div class="card-h"><h2>Φάκελος PDF</h2><span class="hint">Κοινός για όλες τις πολυκατοικίες</span></div><div class="card-b" style="display:grid;gap:12px">
         ${api ? `<div class="folder"><code>${esc(data.prefs.pdfDir || pdfDefault)}</code>
           <button class="btn sm" data-act="pdf-folder">Αλλαγή…</button><button class="btn sm" data-act="pdf-folder-open">Άνοιγμα</button>${data.prefs.pdfDir ? '<button class="btn sm ghost" data-act="pdf-folder-reset">Προεπιλογή</button>' : ''}</div>
@@ -576,6 +602,13 @@
     else if (root === 'a') { const [id, ...rest] = path.split('.'); const a = b.apartments.find((x) => x.id === id); if (!a) return; setPath(a, rest.join('.'), value); }
     // Συγχρονισμός άλλων πεδίων με την ίδια διαδρομή (π.χ. range + αριθμός).
     $$(`[data-root="${root}"][data-path="${path}"]`).forEach((x) => { if (x !== el && x.type !== 'checkbox') x.value = value; });
+    if (el.hasAttribute('data-rerender')) {
+      if (root === 'a' && path.endsWith('.meterShared')) {
+        const a = b.apartments.find((x) => x.id === path.split('.')[0]);
+        if (a && value && !a.meterWith) { const c = sortApts(b.apartments).find((x) => x.id !== a.id && !(x.meterWith && x.meterShared !== false)); if (c) a.meterWith = c.id; }
+      }
+      scheduleSave(); rerenderBody(); return;
+    }
     if (el.hasAttribute('data-rail')) { renderRail(); const t = $('#bTitle'); if (t) t.textContent = b.name; }
     scheduleSave();
     refresh();
@@ -648,12 +681,17 @@
       }
       case 'pdf-folder-reset': delete data.prefs.pdfDir; rerenderBody(); scheduleSave(); break;
       case 'pdf-folder-open': api.openPdfDir(data.prefs.pdfDir || pdfDefault); break;
+      case 'bk-folder': { const dir = await api.chooseBackupDir(data.prefs.backupDir || backupDefault); if (dir) { data.prefs.backupDir = dir; rerenderBody(); scheduleSave(); } break; }
+      case 'bk-folder-reset': delete data.prefs.backupDir; rerenderBody(); scheduleSave(); break;
+      case 'bk-folder-open': api.openBackupDir(data.prefs.backupDir || backupDefault); break;
+      case 'bk-now': { const f = await autoBackup('χειροκίνητο'); if (f) { toast('Έγινε αντίγραφο ασφαλείας'); rerenderBody(); } break; }
       case 'close-month': closeMonth(b, p); break;
       case 'reopen': reopen(b, p); break;
       case 'pdf-statement': case 'pdf-receipts': {
         const per = btn.dataset.id ? b.periods.find((x) => x.id === btn.dataset.id) : p;
         preview(b, per, a === 'pdf-statement' ? 'statement' : 'receipts'); break;
       }
+      case 'annual': preview(b, null, 'annual', Number(btn.dataset.year)); break;
       case 'reset-factors': b.elevatorFactors = {}; rerenderBody(); scheduleSave(); break;
       case 'del-building':
         if (!(await confirmBox({ title: 'Διαγραφή πολυκατοικίας', message: `Θα διαγραφεί οριστικά η <b>${esc(b.name)}</b> με ${b.apartments.length} διαμερίσματα και ${b.periods.length} μήνες ιστορικού. Δεν αναιρείται.`, ok: 'Οριστική διαγραφή', danger: true }))) return;
@@ -695,6 +733,7 @@
     b.periods.push(next);
     ui.pId = next.id;
     render(); await saveNow();
+    await autoBackup('κλείσιμο ' + C.periodLabel(p));
     toast(`Άνοιξε ο ${C.periodLabel(next)}`);
   }
 
@@ -717,11 +756,15 @@
     const label = expLabel('extra', p);
     return html.replaceAll('Λοιπά έξοδα', esc(label));
   }
-  function preview(b, p, kind) {
-    const html = reportFor(b, p, kind);
-    const title = kind === 'statement' ? 'Συγκεντρωτικός πίνακας' : 'Ειδοποιητήρια';
-    const fileName = safeName(`${kind === 'statement' ? 'Πίνακας' : 'Ειδοποιητήρια'} ${C.periodLabel(p)}`) + '.pdf';
-    modal(`<div class="d-h"><div><h2>${title}</h2><div style="color:var(--ink-3);font-size:13px">${esc(b.name)} · ${esc(C.periodLabel(p))}</div></div>
+  function preview(b, p, kind, year) {
+    const annual = kind === 'annual';
+    const items = annual ? b.periods.filter((x) => x.year === year).map((x) => ({ period: x, comp: computeFor(b, x) })) : null;
+    const html = annual ? R.annual(b, year, items) : reportFor(b, p, kind);
+    const title = annual ? 'Ετήσια κατάσταση' : kind === 'statement' ? 'Συγκεντρωτικός πίνακας' : 'Ειδοποιητήρια';
+    const label = annual ? String(year) : C.periodLabel(p);
+    const fileName = safeName(`${annual ? 'Ετήσια κατάσταση' : kind === 'statement' ? 'Πίνακας' : 'Ειδοποιητήρια'} ${label}`) + '.pdf';
+    const subdir = annual ? `${year} Ετήσια κατάσταση` : `${p.year}-${String(p.month + 1).padStart(2, '0')} ${C.MONTHS[p.month]}`;
+    modal(`<div class="d-h"><div><h2>${title}</h2><div style="color:var(--ink-3);font-size:13px">${esc(b.name)} · ${esc(label)}</div></div>
       <div class="actions"><button class="btn ghost" data-close>Κλείσιμο</button><button class="btn ${api ? 'ghost' : 'primary'}" id="printBtn">Εκτύπωση</button>${api ? `<button class="btn" id="saveAsBtn">Αποθήκευση ως…</button><button class="btn primary" id="pdfBtn">${I.down}Αποθήκευση PDF</button>` : ''}</div></div>
       <iframe id="pv" title="Προεπισκόπηση"></iframe>`, {
       wide: true,
@@ -735,7 +778,7 @@
             const out = await api.savePdf({
               html, landscape: kind === 'statement', fileName, saveAs,
               dir: data.prefs.pdfDir || pdfDefault, building: b.name,
-              subdir: `${p.year}-${String(p.month + 1).padStart(2, '0')} ${C.MONTHS[p.month]}`
+              subdir
             });
             if (out) toast('Αποθηκεύτηκε: ' + out.split(/[\\/]/).slice(-3).join(' › '));
           } catch (err) { toast('Σφάλμα PDF: ' + err.message); }
@@ -821,6 +864,7 @@
     if (!Array.isArray(incoming.buildings)) { toast('Το αρχείο δεν είναι αντίγραφο της εφαρμογής'); return; }
     const ok = await confirmBox({ title: 'Επαναφορά αντιγράφου', message: `Τα τρέχοντα δεδομένα (${data.buildings.length} πολυκατοικίες) θα αντικατασταθούν από το αντίγραφο (${incoming.buildings.length} πολυκατοικίες).`, ok: 'Επαναφορά', danger: true });
     if (!ok) return;
+    await autoBackup('πριν την επαναφορά');
     data = normalize(incoming); ui.bId = data.buildings[0] ? data.buildings[0].id : null; ui.pId = null; ui.tab = 'month';
     applyTheme(); render(); await saveNow(); toast('Έγινε επαναφορά');
   }
@@ -830,6 +874,7 @@
     if (api && api.platform === 'darwin') document.body.classList.add('mac');
     data = normalize(await store.load());
     if (api && api.pdfDefaultDir) pdfDefault = await api.pdfDefaultDir();
+    if (api && api.backupDefaultDir) backupDefault = await api.backupDefaultDir();
     applyTheme();
     const saved = data.ui || {};
     ui.bId = data.buildings.some((b) => b.id === saved.bId) ? saved.bId : (data.buildings[0] ? data.buildings[0].id : null);
@@ -878,6 +923,7 @@
       else if (j && j.failed) toast('Η τελευταία ενημέρωση δεν ολοκληρώθηκε· έμεινε η προηγούμενη έκδοση.');
     }
     setupDrag();
+    if ((data.prefs.lastBackup || '').slice(0, 10) !== new Date().toISOString().slice(0, 10)) autoBackup('ημερήσιο');
     window.addEventListener('beforeunload', () => { if (saveTimer) saveNow(); });
   }
 

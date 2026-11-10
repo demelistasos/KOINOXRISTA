@@ -142,9 +142,19 @@
     const fixedPool = Math.round(oil.costCents * fixedPct / 100);
     const variablePool = oil.costCents - fixedPool;
     const heatMils = apartments.map((a, i) => (a.noHeating ? 0 : mils[i]));
-    const cons = apartments.map((a) => consumption(rows[a.id]));
+    // Κοινός θερμιδομετρητής: ένα διαμέρισμα (meterWith) διαβάζει τον μετρητή ενός άλλου.
+    // Η χρήση του μετρητή μοιράζεται εξίσου σε όλα τα διαμερίσματα που τον μοιράζονται.
+    const byId = {}; apartments.forEach((a) => { byId[a.id] = a; });
+    const sharing = (a) => !!(a && a.meterWith && a.meterShared !== false);
+    const meterOf = (a) => (sharing(a) && byId[a.meterWith] && !sharing(byId[a.meterWith]) ? a.meterWith : a.id);
+    const share = {}; apartments.forEach((a) => { const k = meterOf(a); share[k] = (share[k] || 0) + 1; });
+    const cons = apartments.map((a) => {
+      const k = meterOf(a); const c = consumption(rows[k]); const n = share[k] || 1;
+      return { ...c, units: c.units / n, meter: k, shareN: n };
+    });
     cons.forEach((c, i) => {
       if (apartments[i].noHeating) return;
+      if (cons[i].meter !== apartments[i].id) return;
       if (c.missing && oil.costCents > 0) warnings.push(`Διαμ. ${apartments[i].code || '—'}: λείπει η νέα ένδειξη θερμιδομετρητή.`);
       if (c.negative) warnings.push(`Διαμ. ${apartments[i].code || '—'}: η νέα ένδειξη είναι μικρότερη από την παλιά.`);
     });
@@ -175,8 +185,8 @@
       return {
         id: a.id, apt: a,
         mils: mils[i], elevMils: elevMils[i], factor: a.noElevator ? 0 : elevatorFactor(a.floor, settings.elevatorFactors),
-        prevUnits: num(r.prevUnits), currUnits: r.currUnits === '' || r.currUnits == null ? null : num(r.currUnits),
-        units: cons[i].units,
+        ...(() => { const mr = rows[cons[i].meter] || {}; return { prevUnits: num(mr.prevUnits), currUnits: mr.currUnits === '' || mr.currUnits == null ? null : num(mr.currUnits) }; })(),
+        units: cons[i].units, shareN: cons[i].shareN, meterId: cons[i].meter,
         heatingFixed, heatingVariable, heating: heatingFixed + heatingVariable,
         elevator, general, breakdown, charges, prevBalance, adjust, adjustNote: r.adjustNote || '', total, payment, newBalance: total - payment
       };

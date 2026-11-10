@@ -97,6 +97,32 @@ ipcMain.handle('backup:export', async (_e, data, suggested) => {
   return filePath;
 });
 
+// ---------- αυτόματα αντίγραφα ----------
+const defaultBackupDir = () => path.join(app.getPath('documents'), 'Κοινόχρηστα Αντίγραφα');
+const KEEP_AUTO = 60;
+ipcMain.handle('backup:defaultDir', () => defaultBackupDir());
+ipcMain.handle('backup:auto', async (_e, data, reason, dir) => {
+  const d = dir || defaultBackupDir();
+  await fs.promises.mkdir(d, { recursive: true });
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+  const why = String(reason || 'αντίγραφο').replace(/[\\/:*?"<>|]+/g, ' ').trim();
+  const file = path.join(d, `koinoxrista-${stamp}-${why}.json`);
+  await fs.promises.writeFile(file, JSON.stringify(data, null, 1), 'utf8');
+  // Κρατάμε μόνο τα πιο πρόσφατα αυτόματα αντίγραφα
+  try {
+    const files = (await fs.promises.readdir(d)).filter((f) => /^koinoxrista-\d{4}-\d{2}-\d{2}_.*\.json$/.test(f)).sort();
+    for (const f of files.slice(0, Math.max(0, files.length - KEEP_AUTO))) await fs.promises.unlink(path.join(d, f)).catch(() => {});
+  } catch { /* τίποτα */ }
+  return file;
+});
+ipcMain.handle('backup:chooseDir', async (_e, current) => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, { title: 'Φάκελος για τα αντίγραφα ασφαλείας', defaultPath: current || defaultBackupDir(), properties: ['openDirectory', 'createDirectory'] });
+  return canceled || !filePaths[0] ? null : filePaths[0];
+});
+ipcMain.handle('backup:openDir', async (_e, dir) => { const d = dir || defaultBackupDir(); await fs.promises.mkdir(d, { recursive: true }); return shell.openPath(d); });
+
 ipcMain.handle('backup:import', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(win, {
     title: 'Επαναφορά από αντίγραφο',

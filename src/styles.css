@@ -388,3 +388,15 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl td.adj .inp { display: inline-block; vertical-align: middle; }
 .tbl td.adj .inp.n { width: 84px; min-width: 0; }
 .tbl td.adj .inp.note { width: 110px; min-width: 0; margin-left: 4px; font-size: 12px; }
+.tbl td.shared { color: var(--ink-3); font-size: 12.5px; text-align: center; font-style: italic; }
+.meter-sel { width: 112px; min-width: 0; padding: 6px 6px; }
+.meter-cell { white-space: nowrap; }
+.meter-cell .meter-sel { display: inline-block; vertical-align: middle; width: 78px; margin-left: 6px; }
+.switch { position: relative; display: inline-block; width: 34px; height: 20px; vertical-align: middle; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.switch i { position: absolute; inset: 0; border-radius: 99px; background: var(--line-strong); transition: background .15s; }
+.switch i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.switch input:checked + i { background: var(--accent); }
+.switch input:checked + i::after { transform: translateX(14px); }
+.switch input:disabled + i { opacity: .45; }
+.switch input:focus-visible + i { box-shadow: var(--focus); }

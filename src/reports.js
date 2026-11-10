@@ -145,7 +145,7 @@
       return `<div class="apt">
         <div class="ah">ΔΙΑΜΕΡΙΣΜΑ: ${esc(r.apt.code)} (${esc(C.floorLabel(r.apt.floor))})</div>
         <div class="sub">Χιλ.: ${f0(r.mils)}${t.elevator > 0 && r.elevator > 0 ? ` | Χιλ. Ασανσέρ: ${f0(r.elevMils)}` : ''}</div>
-        ${oil.costCents > 0 ? `<div class="sub">Παλαιά: ${f2(r.prevUnits)} | Νέα: ${r.currUnits === null ? '—' : f2(r.currUnits)} | Χρήση: ${f2(r.units)}</div>` : ''}
+        ${oil.costCents > 0 ? `<div class="sub">Παλαιά: ${f2(r.prevUnits)} | Νέα: ${r.currUnits === null ? '—' : f2(r.currUnits)} | Χρήση: ${f2(r.units)}${r.shareN > 1 ? ` (κοινός μετρητής ÷${r.shareN})` : ''}</div>` : ''}
         <table class="ch"><thead><tr><th class="l">ΠΕΡΙΓΡΑΦΗ</th><th>ΠΟΣΟ</th></tr></thead>
           <tbody>${body || '<tr><td colspan="2" class="muted">Καμία χρέωση.</td></tr>'}</tbody>
           <tbody class="sum"><tr><td>Σύνολο μήνα:</td><td class="num">${e(r.charges)}</td></tr></tbody>${bal}</table>
@@ -236,5 +236,54 @@
     return `<!doctype html><html lang="el"><head><meta charset="utf-8"><title>Ειδοποιητήρια</title><style>${css}</style></head><body>${pages || '<p>Δεν υπάρχουν διαμερίσματα.</p>'}</body></html>`;
   }
 
-  root.Reports = { statement, receipts };
+  // ---------------- Ετήσια κατάσταση ανά ένοικο (A4 όρθιο) ----------------
+  // items: [{ period, comp }] του έτους, με χρονολογική σειρά.
+  function annual(building, year, items) {
+    const tenants = [];
+    const byKey = {};
+    items.forEach(({ period, comp }) => {
+      const perTenant = {};
+      comp.results.forEach((r) => {
+        const k = ownerKey(r.apt.owner) || 'id:' + r.id;
+        if (!byKey[k]) { byKey[k] = { key: k, owner: r.apt.owner, codes: new Set(), months: [] }; tenants.push(byKey[k]); }
+        byKey[k].codes.add(r.apt.code);
+        const x = perTenant[k] || (perTenant[k] = { period, charges: 0, old: 0, total: 0, payment: 0, balance: 0, open: period.status !== 'closed' });
+        x.charges += r.charges; x.old += r.prevBalance + (r.adjust || 0); x.total += r.total; x.payment += r.payment; x.balance += r.newBalance;
+      });
+      Object.keys(perTenant).forEach((k) => byKey[k].months.push(perTenant[k]));
+    });
+    const sum = (arr, f) => arr.reduce((a, x) => a + x[f], 0);
+    const last = (t) => t.months[t.months.length - 1];
+    const summary = `<section class="page">
+      <h1>ΕΤΗΣΙΑ ΚΑΤΑΣΤΑΣΗ ${year}: ${esc(building.name)}</h1>
+      <div class="meta">Μήνες: ${items.map((i) => esc(C.MONTHS[i.period.month])).join(', ') || '—'}</div>
+      <table class="t"><thead><tr><th class="l">Ένοικος</th><th class="l">Διαμ.</th><th>Κοινόχρηστα έτους</th><th>Πληρωμές έτους</th><th>Υπόλοιπο σήμερα</th></tr></thead>
+      <tbody>${tenants.map((t) => `<tr><td class="l">${esc(t.owner || '—')}</td><td class="l">${esc([...t.codes].join(', '))}</td><td>${m(sum(t.months, 'charges'))}</td><td>${m(sum(t.months, 'payment'))}</td><td class="b">${m(last(t).open ? last(t).total : last(t).balance)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td class="l" colspan="2">Σύνολο</td><td>${m(tenants.reduce((a, t) => a + sum(t.months, 'charges'), 0))}</td><td>${m(tenants.reduce((a, t) => a + sum(t.months, 'payment'), 0))}</td><td>${m(tenants.reduce((a, t) => a + (last(t).open ? last(t).total : last(t).balance), 0))}</td></tr></tfoot></table>
+      <div class="note2">«Υπόλοιπο σήμερα»: ό,τι οφείλεται μετά τις πληρωμές (αρνητικό = πίστωση). Για ανοιχτό μήνα, το ποσό του ειδοποιητηρίου.</div>
+    </section>`;
+    const pages = tenants.filter((t) => t.months.some((x) => x.charges || x.total || x.payment)).map((t) => `<section class="page">
+      <h1>ΕΤΗΣΙΑ ΚΑΤΑΣΤΑΣΗ ${year}: ${esc(building.name)}</h1>
+      <div class="owner">Ένοικος: ${esc(up(t.owner || '—'))} <span class="cnt">(Διαμ.: ${esc([...t.codes].join(', '))})</span></div>
+      <table class="t"><thead><tr><th class="l">Μήνας</th><th>Κοινόχρηστα μήνα</th><th>Παλαιά οφειλή</th><th>Σύνολο ειδοποιητηρίου</th><th>Πληρωμή</th><th>Υπόλοιπο</th></tr></thead>
+      <tbody>${t.months.map((x) => `<tr><td class="l">${esc(C.periodLabel(x.period))}${x.open ? ' (ανοιχτός)' : ''}</td><td>${m(x.charges)}</td><td>${m(x.old)}</td><td>${m(x.total)}</td><td>${x.open ? '—' : m(x.payment)}</td><td>${x.open ? '—' : m(x.balance)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td class="l">Σύνολο έτους</td><td>${m(sum(t.months, 'charges'))}</td><td></td><td></td><td>${m(sum(t.months, 'payment'))}</td><td></td></tr></tfoot></table>
+    </section>`).join('');
+    const css = BASE_CSS + `
+      @page{size:A4;margin:14mm 15mm 12mm}
+      @media screen{.page{width:210mm;min-height:297mm;padding:14mm 15mm}}
+      h1{font-size:13pt;font-weight:700}
+      .meta{margin-top:3px;font-size:9pt}
+      .owner{margin-top:8px;font-size:11pt;font-weight:700}.cnt{font-weight:400;font-size:9pt}
+      table.t{margin-top:12px;font-size:9pt}
+      .t th{font-size:7.8pt;font-weight:700;text-align:right;border-bottom:.75px solid #000;padding:3px 5px;vertical-align:bottom}
+      .t td{text-align:right;padding:3.5px 5px;border-bottom:.5px solid #ccc;font-variant-numeric:tabular-nums;white-space:nowrap}
+      .t .l{text-align:left}.t .b{font-weight:700}
+      .t tfoot td{font-weight:700;border-top:.75px solid #000;border-bottom:0}
+      .note2{margin-top:6px;font-size:7.5pt;color:#444}
+    `;
+    return `<!doctype html><html lang="el"><head><meta charset="utf-8"><title>Ετήσια κατάσταση</title><style>${css}</style></head><body>${summary}${pages}</body></html>`;
+  }
+
+  root.Reports = { statement, receipts, annual };
 })(typeof self !== 'undefined' ? self : this);

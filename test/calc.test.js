@@ -130,3 +130,26 @@ test('manual debt adjustment (credit) enters total and carries via newBalance', 
   assert.strictEqual(C.toCents(next.rows.c.prevBalance), c.newBalance);
   assert.strictEqual(next.rows.c.adjust, undefined);
 });
+
+test('shared heat meter: usage split equally, readings from the main apartment', () => {
+  const a2 = apts.map((a) => (a.id === 'd' ? { ...a, meterWith: 'c' } : a));
+  const p = JSON.parse(JSON.stringify(period));
+  p.rows.c = { prevUnits: 100, currUnits: 130 };
+  p.rows.d = { prevUnits: 0, currUnits: '' };
+  const r = C.compute(a2, p, {});
+  const c = r.results[2], d = r.results[3];
+  assert.strictEqual(c.units, 15); assert.strictEqual(d.units, 15);
+  assert.strictEqual(d.prevUnits, 100); assert.strictEqual(d.currUnits, 130);
+  assert.strictEqual(c.shareN, 2);
+  assert.strictEqual(r.totals.heating, r.totals.oilCost);
+  assert.ok(!r.warnings.some((w) => w.includes(d.apt.code)));
+});
+
+test('shared meter switched off: each apartment uses its own readings again', () => {
+  const a2 = apts.map((a) => (a.id === 'd' ? { ...a, meterWith: 'c', meterShared: false } : a));
+  const p = JSON.parse(JSON.stringify(period));
+  p.rows.c = { prevUnits: 100, currUnits: 130 };
+  p.rows.d = { prevUnits: 10, currUnits: 14 };
+  const r = C.compute(a2, p, {});
+  assert.strictEqual(r.results[2].units, 30); assert.strictEqual(r.results[3].units, 4);
+});
