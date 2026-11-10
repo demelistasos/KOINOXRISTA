@@ -82,7 +82,7 @@
       ${hasHeat ? `<div class="oil">${oilLine}</div>` : '<div style="height:8px"></div>'}
       <table class="main">
         <thead><tr>
-          <th class="l">Ένοικος (Διαμ.)</th><th>τ.μ.</th><th>Χιλ.</th>${E('<th>Χιλ.<br>Ασαν.</th>')}${H('<th>Παλαιά<br>Ένδειξη</th><th>Νέα<br>Ένδειξη</th><th>Χρήση</th><th>Πάγιο</th><th>Μεταβλητό</th><th>Σύνολο<br>Θερμ.</th>')}${E('<th>Ασανσέρ</th>')}<th>Κοιν/στα<br>Έξοδα</th>${P('<th>Προηγ.<br>Οφειλή</th>')}<th>ΣΥΝΟΛΟ</th>
+          <th class="l">Ένοικος (Διαμ.)</th><th>τ.μ.</th><th>Χιλ.</th>${E('<th>Χιλ.<br>Ασαν.</th>')}${H('<th>Παλαιά<br>Ένδειξη</th><th>Νέα<br>Ένδειξη</th><th>Χρήση</th><th>Πάγιο</th><th>Μεταβλητό</th><th>Σύνολο<br>Θερμ.</th>')}${E('<th>Ασανσέρ</th>')}<th>Κοιν/στα<br>Έξοδα</th>${P('<th>Παλαιά<br>Οφειλή</th>')}<th>ΣΥΝΟΛΟ</th>
           ${showPay ? '<th>Πληρωμή</th><th>Υπόλοιπο</th>' : ''}
         </tr></thead>
         <tbody>${rows}</tbody>
@@ -94,7 +94,7 @@
         <div><h3>ΑΝΑΛΥΣΗ ΣΥΝΟΛΙΚΩΝ ΕΞΟΔΩΝ ΠΟΛΥΚΑΤΟΙΚΙΑΣ</h3><div class="list">${exp || '<span class="muted">Δεν υπάρχουν έξοδα.</span>'}</div></div>
         <div class="sumbox">
           <span>Έξοδα μήνα</span><b class="num">${e(t.charges)}</b>
-          ${hasPrev ? `<span>Προηγούμενες οφειλές${t.adjust ? ' / διορθώσεις' : ''}</span><b class="num">${e(t.prevBalance + (t.adjust || 0))}</b>` : ''}
+          ${hasPrev ? `<span>Παλαιές οφειλές</span><b class="num">${e(t.prevBalance + (t.adjust || 0))}</b>` : ''}
           <span class="g">Προς είσπραξη</span><span class="g num">${e(t.total)}</span>
         </div>
       </div>
@@ -140,11 +140,8 @@
       if (r.heatingVariable > 0) items.push(['Χρήση θέρμανσης', r.heatingVariable]);
       if (r.elevator > 0) items.push(['Ασανσέρ', r.elevator]);
       const body = items.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="num">${m(v)}</td></tr>`).join('');
-      const extra = [];
-      if (r.prevBalance !== 0) extra.push([r.prevBalance > 0 ? 'Προηγούμενη οφειλή' : 'Πιστωτικό υπόλοιπο', r.prevBalance]);
-      if (r.adjust) extra.push([(r.adjust > 0 ? 'Διόρθωση' : 'Πίστωση') + (r.adjustNote ? ' (' + r.adjustNote + ')' : ''), r.adjust]);
-      const bal = extra.length ? `<tbody class="bal">${extra.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="num">${m(v)}</td></tr>`).join('')}
-          <tr class="fin"><td>${r.total < 0 ? 'Απομένει πίστωση:' : 'Πληρωτέο:'}</td><td class="num">${e(Math.abs(r.total))}</td></tr></tbody>` : '';
+      const old = r.prevBalance + (r.adjust || 0);
+      const bal = old !== 0 ? `<tbody class="bal"><tr><td>Παλαιά οφειλή</td><td class="num">${m(old)}</td></tr></tbody>` : '';
       return `<div class="apt">
         <div class="ah">ΔΙΑΜΕΡΙΣΜΑ: ${esc(r.apt.code)} (${esc(C.floorLabel(r.apt.floor))})</div>
         <div class="sub">Χιλ.: ${f0(r.mils)}${t.elevator > 0 && r.elevator > 0 ? ` | Χιλ. Ασανσέρ: ${f0(r.elevMils)}` : ''}</div>
@@ -163,7 +160,7 @@
         <thead><tr><th class="l">Ένοικος</th><th class="l">Διαμ.</th>${t.heating ? '<th>Θέρμ.</th>' : ''}${t.elevator ? '<th>Ασαν.</th>' : ''}<th>Κοιν.</th><th>Σύνολο</th></tr></thead>
         <tbody>${allGroups.map((x) => `<tr${x.key === g.key ? ' class="me"' : ''}><td class="own">${esc(x.owner || '—')}</td><td class="codes">${esc(x.codes.join(', '))}</td>${t.heating ? `<td class="num">${m(x.heating)}</td>` : ''}${t.elevator ? `<td class="num">${m(x.elevator)}</td>` : ''}<td class="num">${m(x.general)}</td><td class="num">${m(x.charges)}</td></tr>`).join('')}</tbody>
         <tfoot><tr><td colspan="2">Σύνολο</td>${t.heating ? `<td class="num">${m(t.heating)}</td>` : ''}${t.elevator ? `<td class="num">${m(t.elevator)}</td>` : ''}<td class="num">${m(t.general)}</td><td class="num">${m(t.charges)}</td></tr></tfoot>
-      </table><div class="ovnote">Τα ποσά είναι τα έξοδα του μήνα, χωρίς προηγούμενες οφειλές.</div></div>` : '';
+      </table><div class="ovnote">Τα ποσά είναι τα έξοδα του μήνα, χωρίς παλαιές οφειλές.</div></div>` : '';
 
       return `<section class="page">
         <h1>ΕΙΔΟΠΟΙΗΤΗΡΙΟ ΚΟΙΝΟΧΡΗΣΤΩΝ: ${esc(building.name)}</h1>
@@ -180,7 +177,7 @@
           : `<div class="cols">${aptBox(g.list[0])}${side}</div>${overview}`}
         <div class="pay">
           ${note ? `<div class="note"><span class="warn">⚠</span> ${esc(note)}</div>` : ''}
-          <div class="amt">${grand < 0 ? `<span>ΠΙΣΤΩΤΙΚΟ ΥΠΟΛΟΙΠΟ (δεν οφείλετε τίποτα):</span><b class="num">${e(-grand)}</b>` : `<span>ΣΥΝΟΛΙΚΟ ΠΟΣΟ ΠΡΟΣ ΕΞΟΦΛΗΣΗ:</span><b class="num">${e(grand)}</b>`}</div>
+          <div class="amt"><span>ΣΥΝΟΛΙΚΟ ΠΟΣΟ ΠΡΟΣ ΕΞΟΦΛΗΣΗ:</span><b class="num">${e(grand)}</b></div>
         </div>
       </section>`;
     }).join('');

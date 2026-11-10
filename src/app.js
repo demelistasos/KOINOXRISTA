@@ -370,9 +370,9 @@
     <aside class="summary" id="summary"></aside></div>
 
       <section class="card full">
-        <div class="card-h"><h2>Ενδείξεις & λογαριασμοί</h2><span class="hint">${prevP ? `Η προηγούμενη οφειλή έρχεται από τις εισπράξεις ${MONTHS_GEN[prevP.month]}` : 'Στον πρώτο μήνα γράψε τυχόν παλιές οφειλές'}</span></div>
+        <div class="card-h"><h2>Ενδείξεις & λογαριασμοί</h2><span class="hint">${prevP ? `Η παλαιά οφειλή έρχεται από τις εισπράξεις ${MONTHS_GEN[prevP.month]}` : 'Στον πρώτο μήνα γράψε τυχόν παλιές οφειλές'}</span></div>
         <div class="card-b" style="padding-top:8px">${apts.length ? `<div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Διαμ.</th><th>Ένοικος</th><th>Όροφ.</th><th class="r">Παλιά</th><th class="r">Νέα</th><th class="r">Χρήση</th><th class="r">Προηγ. οφειλή</th><th class="r" title="Χειροκίνητη διόρθωση: θετικό = χρέωση, αρνητικό (με −) = πίστωση">Διόρθωση ±</th><th class="r">Σύνολο</th>${dis ? '<th class="r">Πληρωμή</th><th class="r">Υπόλοιπο</th>' : ''}</tr></thead>
+          <thead><tr><th>Διαμ.</th><th>Ένοικος</th><th>Όροφ.</th><th class="r">Παλιά</th><th class="r">Νέα</th><th class="r">Χρήση</th><th class="r">Παλαιά οφειλή</th><th class="r" title="Χειροκίνητη διόρθωση: θετικό = χρέωση, αρνητικό (με −) = πίστωση">Διόρθωση ±</th><th class="r">Σύνολο</th>${dis ? '<th class="r">Πληρωμή</th><th class="r">Υπόλοιπο</th>' : ''}</tr></thead>
           <tbody>${rowsHtml}</tbody>
           <tfoot><tr><td colspan="5">Σύνολα</td><td class="r" data-out="tf:units"></td><td class="r" data-out="tf:prevBalance"></td><td class="r" data-out="tf:adjust"></td><td class="r" data-out="tf:total"></td>${dis ? '<td class="r" data-out="tf:payment"></td><td class="r" data-out="tf:newBalance"></td>' : ''}</tr></tfoot>
         </table></div>` : `<div class="empty"><b>Δεν υπάρχουν διαμερίσματα</b>Πρόσθεσέ τα από την καρτέλα «Διαμερίσματα».<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="apartments">Πήγαινε στα διαμερίσματα</button></div></div>`}</div>
@@ -427,7 +427,7 @@
         <div class="bar">${parts.map(([, v, c]) => `<i style="width:${(v / sum) * 100}%;background:${c}"></i>`).join('')}</div>
         <div class="legend">${parts.map(([l, v, c, s]) => `<div><em style="background:${c}"></em><span>${l}</span><b>${C.euro(v)}</b>${s && v ? `<span class="sub">${s}</span>` : ''}</div>`).join('')}</div>
         <div class="legend" style="border-top:1px solid var(--line);padding-top:12px">
-          <div><em></em><span>Προηγούμενα υπόλοιπα</span><b>${C.euro(t.prevBalance)}</b></div>
+          <div><em></em><span>Παλαιές οφειλές</span><b>${C.euro(t.prevBalance)}</b></div>
           <div><em></em><span><b>Προς είσπραξη</b></span><b>${C.euro(t.total)}</b></div>
         </div>
       </section>
