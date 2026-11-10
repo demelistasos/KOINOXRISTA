@@ -49,7 +49,7 @@
       <td class="l">${esc(r.apt.owner)} (${esc(r.apt.code)})</td><td>${f2(r.apt.sqm)}</td><td>${f0(r.mils)}</td>${E(`<td>${f0(r.elevMils)}</td>`)}
       ${H(`<td>${f2(r.prevUnits)}</td><td>${r.currUnits === null ? '—' : f2(r.currUnits)}</td><td>${f2(r.units)}</td>
       <td>${m(r.heatingFixed)}</td><td>${m(r.heatingVariable)}</td><td>${m(r.heating)}</td>`)}${E(`<td>${m(r.elevator)}</td>`)}<td>${m(r.general)}</td>
-      ${P(`<td>${m(prevOf(r))}</td>`)}<td class="b">${m(r.total)}</td>
+      <td class="b">${m(r.charges)}</td>${P(`<td>${m(prevOf(r))}</td>`)}
       ${showPay ? `<td>${m(r.payment)}</td><td class="b">${m(r.newBalance)}</td>` : ''}
     </tr>`).join('');
     const exp = expenseList(t, oil).map(([l, v]) => `<div><span>${esc(l)}:</span><b class="num">${e(v)}</b></div>`).join('');
@@ -66,12 +66,13 @@
       .main td.l{max-width:60mm;overflow:hidden;text-overflow:ellipsis}
       .main .b{font-weight:700}
       .main tfoot td{font-weight:700;border-top:1px solid #000;border-bottom:0;padding-top:4px}
-      .exp{margin-top:14px;display:grid;grid-template-columns:1fr 78mm;gap:24px;align-items:start}
+      .exp{margin-top:14px;display:grid;grid-template-columns:1fr 96mm;gap:24px;align-items:start}
       .exp h3{font-size:9pt;font-weight:700;margin-bottom:5px}
       .exp .list{display:grid;grid-template-columns:repeat(2,minmax(0,62mm));gap:2px 26px;font-size:8.3pt}
       .exp .list div{display:flex;justify-content:space-between;gap:10px}
       .sumbox{border:.75px solid #000;padding:7px 10px;display:grid;grid-template-columns:1fr auto;gap:2px 12px;font-size:8.5pt}
-      .sumbox .g{font-size:10.5pt;font-weight:700;border-top:.75px solid #000;padding-top:4px;margin-top:3px}
+      .sumbox .g0{font-size:10.5pt;font-weight:700}
+      .sumbox .sm{font-size:8pt;color:#333;border-top:.5px solid #999;padding-top:3px;margin-top:3px}
       .foot{margin-top:10px;font-size:7pt;color:#555}
     `;
     const oilLine = `ΚΑΤΑΣΤΑΣΗ ΔΕΞΑΜΕΝΗΣ (lt) → Αρχή: ${f2(oil.startL)} | Αγορά: ${purchasesText(oil)} | Τέλος: ${oil.endL === null ? '—' : f2(oil.endL)} | <b>Καταναλώθηκαν: ${f2(oil.consumedL)} lt</b> | Μέση τιμή: ${f3(oil.avgPrice)} €/lt | Κόστος: ${e(oil.costCents)} | Πάγιο ${f0(comp.fixedPct)}%`;
@@ -82,20 +83,19 @@
       ${hasHeat ? `<div class="oil">${oilLine}</div>` : '<div style="height:8px"></div>'}
       <table class="main">
         <thead><tr>
-          <th class="l">Ένοικος (Διαμ.)</th><th>τ.μ.</th><th>Χιλ.</th>${E('<th>Χιλ.<br>Ασαν.</th>')}${H('<th>Παλαιά<br>Ένδειξη</th><th>Νέα<br>Ένδειξη</th><th>Χρήση</th><th>Πάγιο</th><th>Μεταβλητό</th><th>Σύνολο<br>Θερμ.</th>')}${E('<th>Ασανσέρ</th>')}<th>Κοιν/στα<br>Έξοδα</th>${P('<th>Παλαιά<br>Οφειλή</th>')}<th>ΣΥΝΟΛΟ</th>
+          <th class="l">Ένοικος (Διαμ.)</th><th>τ.μ.</th><th>Χιλ.</th>${E('<th>Χιλ.<br>Ασαν.</th>')}${H('<th>Παλαιά<br>Ένδειξη</th><th>Νέα<br>Ένδειξη</th><th>Χρήση</th><th>Πάγιο</th><th>Μεταβλητό</th><th>Σύνολο<br>Θερμ.</th>')}${E('<th>Ασανσέρ</th>')}<th>Κοιν/στα<br>Έξοδα</th><th>ΣΥΝΟΛΟ<br>ΜΗΝΑ</th>${P('<th>Παλαιά<br>Οφειλή</th>')}
           ${showPay ? '<th>Πληρωμή</th><th>Υπόλοιπο</th>' : ''}
         </tr></thead>
         <tbody>${rows}</tbody>
         <tfoot><tr><td class="l">ΣΥΝΟΛΑ:</td><td>${f2(t.sqm)}</td><td>${f0(t.mils)}</td>${E(`<td>${f0(t.elevMils)}</td>`)}${H(`<td></td><td></td><td>${f2(t.units)}</td>
-          <td>${m(t.heatingFixed)}</td><td>${m(t.heatingVariable)}</td><td>${m(t.heating)}</td>`)}${E(`<td>${m(t.elevator)}</td>`)}<td>${m(t.general)}</td>${P(`<td>${m(t.prevBalance + (t.adjust || 0))}</td>`)}<td>${m(t.total)}</td>
+          <td>${m(t.heatingFixed)}</td><td>${m(t.heatingVariable)}</td><td>${m(t.heating)}</td>`)}${E(`<td>${m(t.elevator)}</td>`)}<td>${m(t.general)}</td><td>${m(t.charges)}</td>${P(`<td>${m(t.prevBalance + (t.adjust || 0))}</td>`)}
           ${showPay ? `<td>${m(t.payment)}</td><td>${m(t.newBalance)}</td>` : ''}</tr></tfoot>
       </table>
       <div class="exp">
         <div><h3>ΑΝΑΛΥΣΗ ΣΥΝΟΛΙΚΩΝ ΕΞΟΔΩΝ ΠΟΛΥΚΑΤΟΙΚΙΑΣ</h3><div class="list">${exp || '<span class="muted">Δεν υπάρχουν έξοδα.</span>'}</div></div>
         <div class="sumbox">
-          <span>Έξοδα μήνα</span><b class="num">${e(t.charges)}</b>
-          ${hasPrev ? `<span>Παλαιές οφειλές</span><b class="num">${e(t.prevBalance + (t.adjust || 0))}</b>` : ''}
-          <span class="g">Προς είσπραξη</span><span class="g num">${e(t.total)}</span>
+          <span class="g0">ΣΥΝΟΛΟ ΚΟΙΝΟΧΡΗΣΤΩΝ ΜΗΝΑ</span><b class="g0 num">${e(t.charges)}</b>
+          ${hasPrev ? `<span class="sm">Παλαιές οφειλές (εκτός συνόλου)</span><span class="sm num">${e(t.prevBalance + (t.adjust || 0))}</span>` : ''}
         </div>
       </div>
       <div class="foot">Εκδόθηκε ${new Date().toLocaleDateString('el-GR')}</div>
