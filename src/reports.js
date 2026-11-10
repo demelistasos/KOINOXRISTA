@@ -176,7 +176,7 @@
           : `<div class="cols">${aptBox(g.list[0])}${side}</div>${overview}`}
         <div class="pay">
           ${note ? `<div class="note"><span class="warn">⚠</span> ${esc(note)}</div>` : ''}
-          <div class="amt"><span>ΣΥΝΟΛΙΚΟ ΠΟΣΟ ΠΡΟΣ ΕΞΟΦΛΗΣΗ:</span><b class="num">${e(grand)}</b></div>
+          <div class="amt">${grand < 0 ? `<span>ΠΙΣΤΩΤΙΚΟ ΥΠΟΛΟΙΠΟ (δεν οφείλετε τίποτα):</span><b class="num">${e(-grand)}</b>` : `<span>ΣΥΝΟΛΙΚΟ ΠΟΣΟ ΠΡΟΣ ΕΞΟΦΛΗΣΗ:</span><b class="num">${e(grand)}</b>`}</div>
         </div>
       </section>`;
     }).join('');
