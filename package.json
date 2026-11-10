@@ -1,7 +1,7 @@
 {
   "name": "koinoxrista",
   "productName": "Κοινόχρηστα",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Υπολογισμός κοινοχρήστων πολυκατοικίας — Windows & macOS",
   "main": "main.js",
   "author": "Tasos Demelis",

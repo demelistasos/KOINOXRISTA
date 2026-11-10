@@ -8,6 +8,10 @@ contextBridge.exposeInMainWorld('api', {
   exportBackup: (data, name) => ipcRenderer.invoke('backup:export', data, name),
   importBackup: () => ipcRenderer.invoke('backup:import'),
   savePdf: (opts) => ipcRenderer.invoke('pdf:save', opts),
+  pdfDefaultDir: () => ipcRenderer.invoke('pdf:defaultDir'),
+  choosePdfDir: (current) => ipcRenderer.invoke('pdf:chooseDir', current),
+  openPdfDir: (dir) => ipcRenderer.invoke('pdf:openDir', dir),
+  reveal: (p) => ipcRenderer.invoke('file:reveal', p),
   confirm: (opts) => ipcRenderer.invoke('confirm', opts),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, cmd) => cb(cmd))
 });

@@ -259,6 +259,17 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl .muted { color: var(--ink-3); }
 .tbl tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
 .neg { color: var(--ok); }
+.owed { color: var(--danger); font-weight: 600; }
+.collect { margin-bottom: 22px; border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.collect .card-h { flex-wrap: wrap; }
+.collect .affix .inp { width: 130px; min-width: 0; margin-left: auto; display: block; padding-right: 26px; }
+.collect .affix { width: 130px; margin-left: auto; }
+.paid { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; padding: 4px 10px 4px 8px; border-radius: 999px; border: 1px solid var(--line-strong); font-size: 12.5px; color: var(--ink-2); user-select: none; }
+.paid input { accent-color: var(--ok); width: 15px; height: 15px; margin: 0; }
+.paid:has(input:checked) { border-color: var(--ok); color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); font-weight: 600; }
+.paid:has(input:disabled) { opacity: .4; cursor: default; }
+.folder { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.folder code { flex: 1; min-width: 240px; background: var(--paper); border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; font: 12.5px/1.4 ui-monospace, Menlo, Consolas, monospace; color: var(--ink-2); overflow-wrap: anywhere; }
 .pos-debt { color: var(--danger); }
 .warn-cell { color: var(--warn); font-weight: 700; }
 

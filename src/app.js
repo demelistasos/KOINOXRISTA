@@ -21,6 +21,7 @@
   const ui = { bId: null, pId: null, tab: 'month' };
   let saveTimer = null;
   let lastSaved = null;
+  let pdfDefault = '';
 
   function scheduleSave() {
     clearTimeout(saveTimer);
@@ -76,6 +77,26 @@
     b.apartments.forEach((a) => { if (!p.rows[a.id]) p.rows[a.id] = { prevUnits: '', currUnits: '', prevBalance: '', payment: '' }; });
   }
   const computeFor = (b, p) => C.compute(aptsFor(b, p), p, settingsFor(b, p));
+  const MONTHS_GEN = ['Ιανουαρίου', 'Φεβρουαρίου', 'Μαρτίου', 'Απριλίου', 'Μαΐου', 'Ιουνίου', 'Ιουλίου', 'Αυγούστου', 'Σεπτεμβρίου', 'Οκτωβρίου', 'Νοεμβρίου', 'Δεκεμβρίου'];
+  const centsStr = (c) => (c ? (c / 100).toFixed(2).replace('.', ',') : '');
+
+  // Ο κλειστός μήνας ακριβώς πριν από τον ανοιχτό (εκεί σημειώνονται οι εισπράξεις).
+  function prevClosed(b, p) {
+    if (!p || p.status !== 'open') return null;
+    const i = b.periods.indexOf(p);
+    const prev = i > 0 ? b.periods[i - 1] : null;
+    return prev && prev.status === 'closed' ? prev : null;
+  }
+  // Η οφειλή του ανοιχτού μήνα = υπόλοιπο του προηγούμενου (σύνολο − πληρωμή).
+  function syncBalances(b) {
+    const p = b.periods[b.periods.length - 1];
+    const prev = prevClosed(b, p);
+    if (!prev) return;
+    computeFor(b, prev).results.forEach((r) => {
+      if (!p.rows[r.id]) p.rows[r.id] = { prevUnits: '', currUnits: '', prevBalance: '', payment: '' };
+      p.rows[r.id].prevBalance = centsStr(r.newBalance);
+    });
+  }
   const expLabel = (key, p) => (key === 'extra' && p && p.extraLabel ? `Λοιπά: ${p.extraLabel}` : (C.ALL_EXPENSES.find((x) => x.key === key) || {}).label);
 
   // ---------- εικονίδια ----------
@@ -166,6 +187,7 @@
     const p = period(b);
     ui.pId = p ? p.id : null;
     ensureRows(b, p);
+    syncBalances(b);
     st.innerHTML = head(b, p) + `<div class="body" id="body">${tabBody(b, p)}</div>`;
     refresh();
   }
@@ -221,7 +243,7 @@
     if (!p) return '<div class="empty"><b>Δεν υπάρχει μήνας</b></div>';
     const dis = p.status === 'closed';
     const apts = aptsFor(b, p);
-    const banner = dis ? `<div class="banner"><span>${I.lock.replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ο <b>${esc(C.periodLabel(p))}</b> έχει κλείσει${p.closedAt ? ' στις ' + new Date(p.closedAt).toLocaleDateString('el-GR') : ''}. Τα στοιχεία είναι μόνο για ανάγνωση — μπορείς ακόμα να βγάλεις PDF.</span></div>` : '';
+    const banner = dis ? `<div class="banner"><span>${I.lock.replace('<svg', '<svg width="16" height="16" style="vertical-align:-3px;margin-right:6px"')}Ο <b>${esc(C.periodLabel(p))}</b> έχει κλείσει${p.closedAt ? ' στις ' + new Date(p.closedAt).toLocaleDateString('el-GR') : ''}. Τα στοιχεία είναι μόνο για ανάγνωση — μπορείς ακόμα να βγάλεις PDF.${b.periods[b.periods.indexOf(p) + 1] && b.periods[b.periods.indexOf(p) + 1].status === 'open' ? ` Τις πληρωμές του τις σημειώνεις στον ${esc(C.MONTHS[b.periods[b.periods.indexOf(p) + 1].month])}, στην κάρτα «Εισπράξεις».` : ''}</span></div>` : '';
 
     const expenses = C.ALL_EXPENSES.map((x) => {
       const pinned = b.recurring.includes(x.key);
@@ -238,6 +260,9 @@
         <button class="icon-btn" data-act="del-purchase" data-i="${i}" aria-label="Διαγραφή αγοράς" ${dis ? 'disabled' : ''}>${I.trash}</button>
       </div>`).join('') : '<div class="p-empty">Καμία αγορά πετρελαίου αυτόν τον μήνα.</div>';
 
+    // Το προηγούμενο υπόλοιπο έρχεται αυτόματα από τον προηγούμενο κλειστό μήνα.
+    const prevP = prevClosed(b, p);
+    const derivedIds = new Set(prevP ? aptsFor(b, prevP).map((a) => a.id) : []);
     const rowsHtml = apts.map((a) => {
       const r = p.rows[a.id] || {};
       const cell = (k, ph = '') => `<td><input class="inp n" inputmode="decimal" data-root="p" data-path="rows.${a.id}.${k}" value="${esc(r[k] ?? '')}" placeholder="${ph}" ${dis ? 'disabled' : ''}></td>`;
@@ -245,14 +270,13 @@
         <td class="code">${esc(a.code)}</td><td class="owner" title="${esc(a.owner)}">${esc(a.owner)}</td><td class="muted">${esc(C.floorLabel(a.floor))}</td>
         ${cell('prevUnits', '0')}${cell('currUnits', '—')}
         <td class="r" data-out="r:${a.id}:units"></td>
-        ${cell('prevBalance', '0,00')}
+        ${dis || derivedIds.has(a.id) ? `<td class="r" data-out="r:${a.id}:prevBalance"></td>` : cell('prevBalance', '0,00')}
         <td class="r strong" data-out="r:${a.id}:total"></td>
-        ${cell('payment', '0,00')}
-        <td class="r" data-out="r:${a.id}:newBalance"></td>
+        ${dis ? `<td class="r" data-out="r:${a.id}:payment"></td><td class="r" data-out="r:${a.id}:newBalance"></td>` : ''}
       </tr>`;
     }).join('');
 
-    return `${banner}<div class="grid-main"><div class="stack">
+    return `${banner}${collectionsCard(b, p)}<div class="grid-main"><div class="stack">
       <section class="card">
         <div class="card-h"><h2>Έξοδα μήνα</h2><span class="hint">Η πινέζα κρατά το ποσό και τον επόμενο μήνα</span></div>
         <div class="card-b"><div class="fields">${expenses}
@@ -286,13 +310,48 @@
     <aside class="summary" id="summary"></aside></div>
 
       <section class="card full">
-        <div class="card-h"><h2>Ενδείξεις & λογαριασμοί</h2><span class="hint">Το υπόλοιπο μεταφέρεται στον επόμενο μήνα</span></div>
+        <div class="card-h"><h2>Ενδείξεις & λογαριασμοί</h2><span class="hint">${prevP ? `Η προηγούμενη οφειλή έρχεται από τις εισπράξεις ${MONTHS_GEN[prevP.month]}` : 'Στον πρώτο μήνα γράψε τυχόν παλιές οφειλές'}</span></div>
         <div class="card-b" style="padding-top:8px">${apts.length ? `<div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Διαμ.</th><th>Ένοικος</th><th>Όροφ.</th><th class="r">Παλιά</th><th class="r">Νέα</th><th class="r">Χρήση</th><th class="r">Προηγ. υπόλ.</th><th class="r">Σύνολο</th><th class="r">Πληρωμή</th><th class="r">Νέο υπόλ.</th></tr></thead>
+          <thead><tr><th>Διαμ.</th><th>Ένοικος</th><th>Όροφ.</th><th class="r">Παλιά</th><th class="r">Νέα</th><th class="r">Χρήση</th><th class="r">Προηγ. οφειλή</th><th class="r">Σύνολο</th>${dis ? '<th class="r">Πληρωμή</th><th class="r">Υπόλοιπο</th>' : ''}</tr></thead>
           <tbody>${rowsHtml}</tbody>
-          <tfoot><tr><td colspan="5">Σύνολα</td><td class="r" data-out="tf:units"></td><td class="r" data-out="tf:prevBalance"></td><td class="r" data-out="tf:total"></td><td class="r" data-out="tf:payment"></td><td class="r" data-out="tf:newBalance"></td></tr></tfoot>
+          <tfoot><tr><td colspan="5">Σύνολα</td><td class="r" data-out="tf:units"></td><td class="r" data-out="tf:prevBalance"></td><td class="r" data-out="tf:total"></td>${dis ? '<td class="r" data-out="tf:payment"></td><td class="r" data-out="tf:newBalance"></td>' : ''}</tr></tfoot>
         </table></div>` : `<div class="empty"><b>Δεν υπάρχουν διαμερίσματα</b>Πρόσθεσέ τα από την καρτέλα «Διαμερίσματα».<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="apartments">Πήγαινε στα διαμερίσματα</button></div></div>`}</div>
       </section>`;
+  }
+
+  // ---------- εισπράξεις προηγούμενου μήνα ----------
+  function collectionsCard(b, p) {
+    const prev = prevClosed(b, p);
+    if (!prev) return '';
+    const comp = computeFor(b, prev);
+    const rows = comp.results.map((r) => {
+      const pay = (prev.rows[r.id] || {}).payment ?? '';
+      return `<tr>
+        <td class="code">${esc(r.apt.code)}</td><td class="owner" title="${esc(r.apt.owner)}">${esc(r.apt.owner)}</td>
+        <td class="r strong">${C.euro(r.total)}</td>
+        <td style="text-align:center"><label class="paid"><input type="checkbox" data-paychk="${r.id}" ${r.total > 0 && r.payment >= r.total ? 'checked' : ''} ${r.total <= 0 ? 'disabled' : ''}><span>Πλήρωσε</span></label></td>
+        <td><div class="affix"><input class="inp n" inputmode="decimal" data-payamt="${r.id}" value="${esc(pay)}" placeholder="0,00" aria-label="Ποσό πληρωμής"><i>€</i></div></td>
+        <td class="r" data-out="pay:${r.id}"></td>
+      </tr>`;
+    }).join('');
+    return `<section class="card collect" id="collect">
+      <div class="card-h"><h2>Εισπράξεις ${MONTHS_GEN[prev.month]}</h2><span class="hint">Τσέκαρε ποιοι πλήρωσαν. Όσα μένουν απλήρωτα περνούν αυτόματα ως οφειλή στον ${esc(C.MONTHS[p.month])}.</span></div>
+      <div class="card-b" style="padding-top:8px"><div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Διαμ.</th><th>Ένοικος</th><th class="r">Ειδοποιητήριο</th><th style="text-align:center">Εξόφληση</th><th class="r">Πληρωμή</th><th class="r">Μένει οφειλή</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div></div>
+      <div class="card-f"><span data-out="pay:summary"></span><button class="btn sm" data-act="pay-all">Όλοι πλήρωσαν</button></div>
+    </section>`;
+  }
+
+  function setPayment(id, value) {
+    const b = building(); const prev = prevClosed(b, period(b)); if (!prev) return;
+    if (!prev.rows[id]) prev.rows[id] = { prevUnits: '', currUnits: '', prevBalance: '', payment: '' };
+    prev.rows[id].payment = value;
+    if (value) prev.rows[id].paidAt = prev.rows[id].paidAt || new Date().toISOString(); else delete prev.rows[id].paidAt;
+    syncBalances(b);
+    scheduleSave();
+    refresh();
   }
 
   function summaryHtml(b, p, comp) {
@@ -376,6 +435,12 @@
       <section class="card"><div class="card-h"><h2>Συντελεστές ανελκυστήρα</h2><button class="btn ghost sm" data-act="reset-factors">Επαναφορά προεπιλογών</button></div>
         <div class="card-b"><p style="margin:0 0 14px;color:var(--ink-2)">Τα χιλιοστά ασανσέρ = χιλιοστά × συντελεστής ορόφου, αναγμένα στα 1000. Άφησε κενό για την προεπιλογή (ισόγειο 0, 1ος 1,00 και +0,10 ανά όροφο).</p><div class="factors">${factors}</div></div></section>
       <section class="card"><div class="card-h"><h2>Επαναλαμβανόμενα έξοδα</h2></div><div class="card-b"><p style="margin:0 0 12px;color:var(--ink-2)">Όσα επιλέξεις μεταφέρονται με το ίδιο ποσό στον επόμενο μήνα κατά το κλείσιμο.</p><div class="chips">${chips}</div></div></section>
+      <section class="card"><div class="card-h"><h2>Φάκελος PDF</h2><span class="hint">Κοινός για όλες τις πολυκατοικίες</span></div><div class="card-b" style="display:grid;gap:12px">
+        ${api ? `<div class="folder"><code>${esc(data.prefs.pdfDir || pdfDefault)}</code>
+          <button class="btn sm" data-act="pdf-folder">Αλλαγή…</button><button class="btn sm" data-act="pdf-folder-open">Άνοιγμα</button>${data.prefs.pdfDir ? '<button class="btn sm ghost" data-act="pdf-folder-reset">Προεπιλογή</button>' : ''}</div>
+          <p style="margin:0;color:var(--ink-2)">Τα PDF αποθηκεύονται αυτόματα με αυτή τη σειρά: φάκελος › πολυκατοικία › μήνας, π.χ. <b>${esc(b.name)} › 2026-11 Νοέμβριος</b>. Αν ξαναβγάλεις PDF για τον ίδιο μήνα, αντικαθίσταται το παλιό αρχείο.</p>`
+        : '<p style="margin:0;color:var(--ink-2)">Διαθέσιμο στην εφαρμογή για υπολογιστή.</p>'}
+      </div></section>
       <section class="card"><div class="card-h"><h2>Ειδοποιητήρια</h2></div><div class="card-b" style="display:grid;gap:14px">
         <label class="field"><span>Σημείωση προς τους ενοίκους</span><textarea class="inp" data-root="b" data-path="note" rows="2">${esc(b.note || '')}</textarea></label>
         <label class="check"><input type="checkbox" data-root="b" data-path="receiptOverview" ${b.receiptOverview !== false ? 'checked' : ''}>Να εμφανίζεται ο πίνακας όλων των διαμερισμάτων στο κάθε ειδοποιητήριο</label>
@@ -414,6 +479,20 @@
       if (kind === 'r' && c === 'newBalance' && byId[id]) el.className = 'r ' + (byId[id].newBalance < 0 ? 'neg' : byId[id].newBalance === 0 ? 'muted' : '');
     });
     const s = $('#summary'); if (s) s.innerHTML = summaryHtml(b, p, comp);
+    // Εισπράξεις προηγούμενου μήνα
+    const prev = prevClosed(b, p);
+    if (prev && $('#collect')) {
+      const pc = computeFor(b, prev);
+      let due = 0, paid = 0, open = 0, payers = 0;
+      pc.results.forEach((r) => {
+        const el = $(`[data-out="pay:${r.id}"]`);
+        if (el) { el.textContent = r.newBalance > 0 ? C.euro(r.newBalance) : r.newBalance < 0 ? 'Πίστωση ' + C.euro(-r.newBalance) : '—'; el.className = 'r ' + (r.newBalance > 0 ? 'owed' : 'muted'); }
+        const chk = $(`[data-paychk="${r.id}"]`); if (chk) chk.checked = r.total > 0 && r.payment >= r.total;
+        due += Math.max(0, r.total); paid += r.payment; if (r.newBalance > 0) open++; if (r.payment > 0) payers++;
+      });
+      const sm = $('[data-out="pay:summary"]');
+      if (sm) sm.innerHTML = `Εισπράχθηκαν <strong>${C.euro(paid)}</strong> από ${C.euro(due)} · ${open ? `<span class="owed">${open} με οφειλή</span>` : '<span class="neg">όλοι εξόφλησαν</span>'}`;
+    }
   }
 
   // ---------- επεξεργασία ----------
@@ -472,6 +551,24 @@
         b.periods.forEach((x) => { if (x.status === 'open') delete x.rows[apt.id]; });
         rerenderBody(); renderRail(); scheduleSave(); break;
       }
+      case 'pay-all': {
+        const prev = prevClosed(b, p); if (!prev) break;
+        computeFor(b, prev).results.forEach((r) => {
+          if (r.total <= 0) return;
+          if (!prev.rows[r.id]) prev.rows[r.id] = {};
+          prev.rows[r.id].payment = centsStr(r.total);
+          prev.rows[r.id].paidAt = prev.rows[r.id].paidAt || new Date().toISOString();
+          const amt = $(`[data-payamt="${r.id}"]`); if (amt) amt.value = centsStr(r.total);
+        });
+        syncBalances(b); scheduleSave(); refresh(); break;
+      }
+      case 'pdf-folder': {
+        const dir = await api.choosePdfDir(data.prefs.pdfDir || pdfDefault);
+        if (dir) { data.prefs.pdfDir = dir; rerenderBody(); scheduleSave(); }
+        break;
+      }
+      case 'pdf-folder-reset': delete data.prefs.pdfDir; rerenderBody(); scheduleSave(); break;
+      case 'pdf-folder-open': api.openPdfDir(data.prefs.pdfDir || pdfDefault); break;
       case 'close-month': closeMonth(b, p); break;
       case 'reopen': reopen(b, p); break;
       case 'pdf-statement': case 'pdf-receipts': {
@@ -506,7 +603,7 @@
     const warn = comp.warnings.length ? `<br><br><span style="color:var(--warn)">Υπάρχουν ${comp.warnings.length} προειδοποιήσεις:</span><ul style="margin:6px 0 0;padding-left:18px">${comp.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : '';
     const ok = await confirmBox({
       title: `Κλείσιμο ${C.periodLabel(p)}`,
-      message: `Ο μήνας κλειδώνει και ανοίγει ο <b>${C.MONTHS[nm.month]} ${nm.year}</b> με:<ul style="margin:8px 0 0;padding-left:18px"><li>τις νέες ενδείξεις ως παλιές</li><li>το απόθεμα τέλους (${C.fmt(comp.oil.endL === null ? comp.oil.availableL : comp.oil.endL)} lt) ως αρχή, με τιμή ${C.fmt(comp.oil.avgPrice, 3)} €/lt</li><li>τα νέα υπόλοιπα κάθε διαμερίσματος (σύνολο ${C.euro(comp.totals.newBalance)})</li><li>τα επαναλαμβανόμενα έξοδα</li></ul>${warn}`,
+      message: `Ο μήνας κλειδώνει και ανοίγει ο <b>${C.MONTHS[nm.month]} ${nm.year}</b> με:<ul style="margin:8px 0 0;padding-left:18px"><li>τις νέες ενδείξεις ως παλιές</li><li>το απόθεμα τέλους (${C.fmt(comp.oil.endL === null ? comp.oil.availableL : comp.oil.endL)} lt) ως αρχή, με τιμή ${C.fmt(comp.oil.avgPrice, 3)} €/lt</li><li>τα ποσά του μήνα (${C.euro(comp.totals.total)}) ως οφειλή — όποιος πληρώσει, το τσεκάρεις στις «Εισπράξεις» του επόμενου μήνα</li><li>τα επαναλαμβανόμενα έξοδα</li></ul>${warn}`,
       ok: 'Κλείσιμο μήνα'
     });
     if (!ok) return;
@@ -544,21 +641,31 @@
   function preview(b, p, kind) {
     const html = reportFor(b, p, kind);
     const title = kind === 'statement' ? 'Συγκεντρωτικός πίνακας' : 'Ειδοποιητήρια';
-    const fileName = safeName(`${kind === 'statement' ? 'Πίνακας' : 'Ειδοποιητήρια'} ${b.name} ${C.periodLabel(p)}`) + '.pdf';
+    const fileName = safeName(`${kind === 'statement' ? 'Πίνακας' : 'Ειδοποιητήρια'} ${C.periodLabel(p)}`) + '.pdf';
     modal(`<div class="d-h"><div><h2>${title}</h2><div style="color:var(--ink-3);font-size:13px">${esc(b.name)} · ${esc(C.periodLabel(p))}</div></div>
-      <div class="actions"><button class="btn ghost" data-close>Κλείσιμο</button><button class="btn ${api ? '' : 'primary'}" id="printBtn">Εκτύπωση</button>${api ? `<button class="btn primary" id="pdfBtn">${I.down}Αποθήκευση PDF</button>` : ''}</div></div>
+      <div class="actions"><button class="btn ghost" data-close>Κλείσιμο</button><button class="btn ${api ? 'ghost' : 'primary'}" id="printBtn">Εκτύπωση</button>${api ? `<button class="btn" id="saveAsBtn">Αποθήκευση ως…</button><button class="btn primary" id="pdfBtn">${I.down}Αποθήκευση PDF</button>` : ''}</div></div>
       <iframe id="pv" title="Προεπισκόπηση"></iframe>`, {
       wide: true,
       onMount: (root) => {
         const fr = $('#pv', root); fr.srcdoc = html;
         const doPrint = () => fr.contentWindow.print();
         $('#printBtn', root).onclick = doPrint;
-        if (api) $('#pdfBtn', root).onclick = async () => {
-          const btn = $('#pdfBtn', root); btn.disabled = true;
-          try { const out = await api.savePdf({ html, landscape: kind === 'statement', fileName }); if (out) toast('Το PDF αποθηκεύτηκε'); }
-          catch (err) { toast('Σφάλμα PDF: ' + err.message); }
+        const save = async (btn, saveAs) => {
+          btn.disabled = true;
+          try {
+            const out = await api.savePdf({
+              html, landscape: kind === 'statement', fileName, saveAs,
+              dir: data.prefs.pdfDir || pdfDefault, building: b.name,
+              subdir: `${p.year}-${String(p.month + 1).padStart(2, '0')} ${C.MONTHS[p.month]}`
+            });
+            if (out) toast('Αποθηκεύτηκε: ' + out.split(/[\\/]/).slice(-3).join(' › '));
+          } catch (err) { toast('Σφάλμα PDF: ' + err.message); }
           finally { btn.disabled = false; }
         };
+        if (api) {
+          $('#pdfBtn', root).onclick = (e) => save(e.currentTarget, false);
+          $('#saveAsBtn', root).onclick = (e) => save(e.currentTarget, true);
+        }
       }
     });
   }
@@ -643,6 +750,7 @@
   async function init() {
     if (api && api.platform === 'darwin') document.body.classList.add('mac');
     data = normalize(await store.load());
+    if (api && api.pdfDefaultDir) pdfDefault = await api.pdfDefaultDir();
     applyTheme();
     const saved = data.ui || {};
     ui.bId = data.buildings.some((b) => b.id === saved.bId) ? saved.bId : (data.buildings[0] ? data.buildings[0].id : null);
@@ -650,8 +758,19 @@
     render();
 
     document.addEventListener('click', (e) => { const btn = e.target.closest('[data-act]'); if (btn && !btn.disabled) act(btn); });
-    document.addEventListener('input', (e) => { if (e.target.matches('[data-path]') && e.target.type !== 'checkbox') onEdit(e.target); });
+    document.addEventListener('input', (e) => {
+      if (e.target.matches('[data-path]') && e.target.type !== 'checkbox') onEdit(e.target);
+      if (e.target.matches('[data-payamt]')) setPayment(e.target.dataset.payamt, e.target.value);
+    });
     document.addEventListener('change', (e) => {
+      if (e.target.matches('[data-paychk]')) {
+        const id = e.target.dataset.paychk;
+        const b = building(); const prev = prevClosed(b, period(b));
+        const r = computeFor(b, prev).results.find((x) => x.id === id);
+        const v = e.target.checked && r ? centsStr(r.total) : '';
+        const amt = $(`[data-payamt="${id}"]`); if (amt) amt.value = v;
+        setPayment(id, v);
+      }
       if (e.target.matches('[data-path][type="checkbox"]')) onEdit(e.target);
       if (e.target.id === 'periodSel') { ui.pId = e.target.value; render(); }
     });

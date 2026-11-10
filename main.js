@@ -100,13 +100,40 @@ ipcMain.handle('backup:import', async () => {
 });
 
 // ---------- PDF ----------
-ipcMain.handle('pdf:save', async (_e, { html, landscape, fileName }) => {
-  const { canceled, filePath } = await dialog.showSaveDialog(win, {
-    title: 'Αποθήκευση PDF',
-    defaultPath: path.join(app.getPath('documents'), fileName || 'koinoxrista.pdf'),
-    filters: [{ name: 'PDF', extensions: ['pdf'] }]
+const defaultPdfDir = () => path.join(app.getPath('documents'), 'Κοινόχρηστα PDF');
+const safe = (s) => String(s || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || 'Χωρίς όνομα';
+
+ipcMain.handle('pdf:defaultDir', () => defaultPdfDir());
+ipcMain.handle('pdf:chooseDir', async (_e, current) => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: 'Φάκελος για τα PDF',
+    defaultPath: current || defaultPdfDir(),
+    properties: ['openDirectory', 'createDirectory']
   });
-  if (canceled || !filePath) return null;
+  return canceled || !filePaths[0] ? null : filePaths[0];
+});
+ipcMain.handle('pdf:openDir', async (_e, dir) => {
+  const d = dir || defaultPdfDir();
+  await fs.promises.mkdir(d, { recursive: true });
+  return shell.openPath(d);
+});
+
+// Αποθήκευση PDF. Χωρίς saveAs: πάει αυτόματα στο <φάκελος>/<πολυκατοικία>/<subdir>/<fileName>.
+ipcMain.handle('pdf:save', async (_e, { html, landscape, fileName, dir, building, subdir, saveAs }) => {
+  let filePath;
+  if (saveAs) {
+    const r = await dialog.showSaveDialog(win, {
+      title: 'Αποθήκευση PDF',
+      defaultPath: path.join(dir || defaultPdfDir(), safe(fileName)),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    });
+    if (r.canceled || !r.filePath) return null;
+    filePath = r.filePath;
+  } else {
+    const folder = path.join(dir || defaultPdfDir(), safe(building), safe(subdir));
+    await fs.promises.mkdir(folder, { recursive: true });
+    filePath = path.join(folder, safe(fileName));
+  }
 
   const tmpHtml = path.join(app.getPath('temp'), `koinoxrista-${Date.now()}.html`);
   await fs.promises.writeFile(tmpHtml, html, 'utf8');
@@ -127,6 +154,7 @@ ipcMain.handle('pdf:save', async (_e, { html, landscape, fileName }) => {
   shell.openPath(filePath);
   return filePath;
 });
+ipcMain.handle('file:reveal', (_e, p) => { if (p) shell.showItemInFolder(p); });
 
 ipcMain.handle('confirm', async (_e, { message, detail, ok }) => {
   const r = await dialog.showMessageBox(win, {
