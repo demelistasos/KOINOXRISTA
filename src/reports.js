@@ -1,4 +1,6 @@
-/* Κοινόχρηστα — αναφορές για εκτύπωση/PDF (HTML με δικό του CSS). */
+/* Κοινόχρηστα — αναφορές για εκτύπωση/PDF.
+ * Σχεδιασμένες για οικονομία μελανιού: λευκό φόντο, χωρίς γεμίσματα,
+ * μόνο κείμενο και λεπτές γραμμές. */
 (function (root) {
   'use strict';
   const C = root.Calc;
@@ -7,111 +9,89 @@
   const e = C.euro;
   const f2 = (v) => C.fmt(v, 2);
   const f0 = (v) => C.fmt(v, 0);
+  const f3 = (v) => C.fmt(v, 3);
+  // Κεφαλαία χωρίς τόνους, όπως γράφονται στα ελληνικά.
+  const up = (v) => String(v == null ? '' : v).normalize('NFD').replace(/\u0301/g, '').normalize('NFC').toUpperCase();
 
   const BASE_CSS = `
   *{box-sizing:border-box}
-  html,body{margin:0;background:#fff;color:#1c2130}
-  body{font:9.5pt/1.4 -apple-system,"Segoe UI",system-ui,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .serif{font-family:"Palatino","Palatino Linotype","Book Antiqua",Georgia,serif}
+  html,body{margin:0;background:#fff;color:#000}
+  body{font:9pt/1.35 -apple-system,"Segoe UI",system-ui,Arial,sans-serif}
   .num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
   h1,h2,h3{margin:0}
   .page{page-break-after:always;break-after:page}
   .page:last-child{page-break-after:auto;break-after:auto}
   table{border-collapse:collapse;width:100%}
-  .muted{color:#6b7080}
-  .accent{color:#b5532c}
+  .muted{color:#444}
   @media screen{body{background:#e9e6df;padding:20px 0}.page{background:#fff;margin:0 auto 20px;box-shadow:0 4px 18px rgba(0,0,0,.12)}}
   `;
 
-  function header(building, period, kind) {
-    return `<header class="hd">
-      <div><div class="kind">${esc(kind)}</div><h1 class="serif">${esc(building.name)}</h1>${building.address ? `<div class="muted">${esc(building.address)}</div>` : ''}</div>
-      <div class="per"><div class="muted">Περίοδος</div><div class="serif pm">${esc(C.periodLabel(period))}</div></div>
-    </header>`;
-  }
-
-  function expenseRows(t, oil) {
+  const expenseList = (t, oil) => {
     const rows = C.ALL_EXPENSES.filter((x) => t.expenses[x.key] > 0).map((x) => [x.label, t.expenses[x.key]]);
-    if (oil.costCents > 0) rows.push(['Πετρέλαιο θέρμανσης', oil.costCents]);
+    if (oil.costCents > 0) rows.push(['Πετρέλαιο', oil.costCents]);
     return rows;
-  }
+  };
+  const purchasesText = (oil) => oil.purchases.length ? oil.purchases.map((p) => f2(p.liters)).join(' + ') : '0,00';
 
   // ---------------- Συγκεντρωτικός πίνακας (A4 οριζόντιο) ----------------
   function statement(building, period, comp) {
     const { results, totals: t, oil } = comp;
     const showPay = results.some((r) => r.payment !== 0);
     const rows = results.map((r) => `<tr>
-      <td><b>${esc(r.apt.code)}</b></td><td class="own">${esc(r.apt.owner)}</td><td class="c">${esc(C.floorLabel(r.apt.floor))}</td>
-      <td class="num">${f2(r.apt.sqm)}</td><td class="num">${f2(r.mils)}</td><td class="num">${f2(r.elevMils)}</td>
-      <td class="num">${f2(r.prevUnits)}</td><td class="num">${r.currUnits === null ? '—' : f2(r.currUnits)}</td><td class="num">${f2(r.units)}</td>
-      <td class="num">${m(r.heatingFixed)}</td><td class="num">${m(r.heatingVariable)}</td><td class="num">${m(r.elevator)}</td><td class="num">${m(r.general)}</td>
-      <td class="num b">${m(r.charges)}</td><td class="num">${m(r.prevBalance)}</td><td class="num b tot">${m(r.total)}</td>
-      ${showPay ? `<td class="num">${m(r.payment)}</td><td class="num b">${m(r.newBalance)}</td>` : ''}
+      <td class="l">${esc(r.apt.owner)} (${esc(r.apt.code)})</td><td>${f2(r.apt.sqm)}</td><td>${f0(r.mils)}</td><td>${f0(r.elevMils)}</td>
+      <td>${f2(r.prevUnits)}</td><td>${r.currUnits === null ? '—' : f2(r.currUnits)}</td><td>${f2(r.units)}</td>
+      <td>${m(r.heatingFixed)}</td><td>${m(r.heatingVariable)}</td><td>${m(r.heating)}</td><td>${m(r.elevator)}</td><td>${m(r.general)}</td>
+      <td>${m(r.prevBalance)}</td><td class="b">${m(r.total)}</td>
+      ${showPay ? `<td>${m(r.payment)}</td><td class="b">${m(r.newBalance)}</td>` : ''}
     </tr>`).join('');
-    const exp = expenseRows(t, oil).map(([l, v]) => `<div><span>${esc(l)}</span><b class="num">${e(v)}</b></div>`).join('');
+    const exp = expenseList(t, oil).map(([l, v]) => `<div><span>${esc(l)}:</span><b class="num">${e(v)}</b></div>`).join('');
     const css = BASE_CSS + `
       @page{size:A4 landscape;margin:12mm 11mm}
       @media screen{.page{width:297mm;min-height:210mm;padding:12mm 11mm}}
-      .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1c2130;padding-bottom:8px}
-      .kind{font-size:7.5pt;letter-spacing:.14em;text-transform:uppercase;color:#b5532c;font-weight:700}
-      h1{font-size:19pt;font-weight:600}
-      .per{text-align:right}.pm{font-size:15pt;font-weight:600}
-      .oil{display:flex;gap:0;margin:9px 0 10px;border:1px solid #d9d2c3;border-radius:5px;overflow:hidden}
-      .oil div{flex:1;padding:5px 9px;border-right:1px solid #e3ddd0;background:#f7f4ee}
-      .oil div:last-child{border-right:0;background:#f8e6db}
-      .oil small{display:block;font-size:7pt;color:#6b7080;text-transform:uppercase;letter-spacing:.06em}
-      .oil b{font-size:10pt}
-      table.main{font-size:7.9pt}
-      .main th{background:#1c2130;color:#fff;font-weight:600;font-size:7pt;text-transform:uppercase;letter-spacing:.03em;padding:5px 4px;text-align:right;vertical-align:bottom}
-      .main th.l{text-align:left}.main th.c,.main td.c{text-align:center}
-      .main th.grp{background:#3a4152;text-align:center}
-      .main td{padding:3px 4px;border-bottom:1px solid #e6e1d6}
-      .main tbody tr:nth-child(even) td{background:#faf8f4}
-      .main td.own{max-width:42mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .main .b{font-weight:700}.main .tot{background:#f8e6db!important;color:#8f3f1f}
-      .main tfoot td{font-weight:700;border-top:1.5px solid #1c2130;border-bottom:0;padding-top:5px}
-      .exp{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:18px}
-      .exp h3{font-size:8pt;text-transform:uppercase;letter-spacing:.1em;color:#6b7080;margin-bottom:5px}
-      .exp .list{display:grid;grid-template-columns:1fr 1fr;gap:2px 22px}
-      .exp .list div{display:flex;justify-content:space-between;border-bottom:1px dotted #d9d2c3;padding:2px 0}
-      .sumbox{border:1px solid #1c2130;border-radius:5px;padding:8px 12px;display:grid;grid-template-columns:1fr auto;gap:3px 12px;align-self:start}
-      .sumbox .g{font-size:12pt;font-weight:700;border-top:1px solid #1c2130;padding-top:4px;margin-top:3px}
-      .foot{margin-top:10px;font-size:7pt;color:#8a8f9c;display:flex;justify-content:space-between}
+      h1{font-size:13pt;font-weight:700}
+      .addr{font-size:8.5pt;margin-top:1px}
+      .oil{margin:7px 0 10px;font-size:8.3pt}
+      table.main{font-size:7.8pt}
+      .main th{font-weight:700;font-size:7.2pt;padding:3px 3px 4px;text-align:center;vertical-align:bottom;border-bottom:1px solid #000;line-height:1.2}
+      .main th.l,.main td.l{text-align:left}
+      .main td{padding:3px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:.5px solid #bbb}
+      .main td.l{max-width:60mm;overflow:hidden;text-overflow:ellipsis}
+      .main .b{font-weight:700}
+      .main tfoot td{font-weight:700;border-top:1px solid #000;border-bottom:0;padding-top:4px}
+      .exp{margin-top:14px;display:grid;grid-template-columns:1fr 78mm;gap:24px;align-items:start}
+      .exp h3{font-size:9pt;font-weight:700;margin-bottom:5px}
+      .exp .list{display:grid;grid-template-columns:repeat(2,minmax(0,62mm));gap:2px 26px;font-size:8.3pt}
+      .exp .list div{display:flex;justify-content:space-between;gap:10px}
+      .sumbox{border:.75px solid #000;padding:7px 10px;display:grid;grid-template-columns:1fr auto;gap:2px 12px;font-size:8.5pt}
+      .sumbox .g{font-size:10.5pt;font-weight:700;border-top:.75px solid #000;padding-top:4px;margin-top:3px}
+      .foot{margin-top:10px;font-size:7pt;color:#555}
     `;
+    const oilLine = `ΚΑΤΑΣΤΑΣΗ ΔΕΞΑΜΕΝΗΣ (lt) → Αρχή: ${f2(oil.startL)} | Αγορά: ${purchasesText(oil)} | Τέλος: ${oil.endL === null ? '—' : f2(oil.endL)} | <b>Καταναλώθηκαν: ${f2(oil.consumedL)} lt</b> | Μέση τιμή: ${f3(oil.avgPrice)} €/lt | Κόστος: ${e(oil.costCents)} | Πάγιο ${f0(comp.fixedPct)}%`;
     return `<!doctype html><html lang="el"><head><meta charset="utf-8"><title>Συγκεντρωτικός πίνακας</title><style>${css}</style></head><body>
     <section class="page">
-      ${header(building, period, 'Συγκεντρωτικός πίνακας κοινοχρήστων')}
-      <div class="oil">
-        <div><small>Απόθεμα αρχής</small><b class="num">${f2(oil.startL)} lt</b></div>
-        <div><small>Αγορές</small><b class="num">${f2(oil.boughtL)} lt</b></div>
-        <div><small>Απόθεμα τέλους</small><b class="num">${oil.endL === null ? '—' : f2(oil.endL) + ' lt'}</b></div>
-        <div><small>Κατανάλωση</small><b class="num">${f2(oil.consumedL)} lt</b></div>
-        <div><small>Μέση τιμή</small><b class="num">${C.fmt(oil.avgPrice, 3)} €/lt</b></div>
-        <div><small>Πάγιο / Χρήση</small><b class="num">${f0(comp.fixedPct)}% / ${f0(100 - comp.fixedPct)}%</b></div>
-        <div><small>Κόστος θέρμανσης</small><b class="num">${e(oil.costCents)}</b></div>
-      </div>
+      <h1>ΣΥΓΚΕΝΤΡΩΤΙΚΟΣ ΠΙΝΑΚΑΣ: ${esc(up(building.name))} — ${esc(up(C.periodLabel(period)))}</h1>
+      ${building.address ? `<div class="addr muted">${esc(building.address)}</div>` : ''}
+      <div class="oil">${oilLine}</div>
       <table class="main">
-        <thead>
-          <tr><th class="l" rowspan="2">Διαμ.</th><th class="l" rowspan="2">Ένοικος</th><th class="c" rowspan="2">Όροφ.</th><th rowspan="2">τ.μ.</th><th rowspan="2">Χιλ.</th><th rowspan="2">Χιλ. ασ.</th>
-          <th class="grp" colspan="3">Θερμιδομετρητής</th><th class="grp" colspan="2">Θέρμανση</th><th rowspan="2">Ασανσέρ</th><th rowspan="2">Γενικά</th><th rowspan="2">Μήνα</th><th rowspan="2">Προηγ.</th><th rowspan="2">Σύνολο</th>
-          ${showPay ? '<th rowspan="2">Πληρωμή</th><th rowspan="2">Υπόλοιπο</th>' : ''}</tr>
-          <tr><th>Παλιά</th><th>Νέα</th><th>Χρήση</th><th>Πάγιο</th><th>Χρήση</th></tr>
-        </thead>
+        <thead><tr>
+          <th class="l">Ένοικος (Διαμ.)</th><th>τ.μ.</th><th>Χιλ.</th><th>Χιλ.<br>Ασαν.</th><th>Παλαιά<br>Ένδειξη</th><th>Νέα<br>Ένδειξη</th><th>Χρήση</th>
+          <th>Πάγιο</th><th>Μεταβλητό</th><th>Σύνολο<br>Θερμ.</th><th>Ασανσέρ</th><th>Κοιν/στα<br>Έξοδα</th><th>Προηγ.<br>Οφειλή</th><th>ΣΥΝΟΛΟ</th>
+          ${showPay ? '<th>Πληρωμή</th><th>Υπόλοιπο</th>' : ''}
+        </tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td colspan="3">Σύνολα</td><td class="num">${f2(t.sqm)}</td><td class="num">${f0(t.mils)}</td><td class="num">${f0(t.elevMils)}</td>
-          <td></td><td></td><td class="num">${f2(t.units)}</td><td class="num">${m(t.heatingFixed)}</td><td class="num">${m(t.heatingVariable)}</td>
-          <td class="num">${m(t.elevator)}</td><td class="num">${m(t.general)}</td><td class="num">${m(t.charges)}</td><td class="num">${m(t.prevBalance)}</td><td class="num">${m(t.total)}</td>
-          ${showPay ? `<td class="num">${m(t.payment)}</td><td class="num">${m(t.newBalance)}</td>` : ''}</tr></tfoot>
+        <tfoot><tr><td class="l">ΣΥΝΟΛΑ:</td><td>${f2(t.sqm)}</td><td>${f0(t.mils)}</td><td>${f0(t.elevMils)}</td><td></td><td></td><td>${f2(t.units)}</td>
+          <td>${m(t.heatingFixed)}</td><td>${m(t.heatingVariable)}</td><td>${m(t.heating)}</td><td>${m(t.elevator)}</td><td>${m(t.general)}</td><td>${m(t.prevBalance)}</td><td>${m(t.total)}</td>
+          ${showPay ? `<td>${m(t.payment)}</td><td>${m(t.newBalance)}</td>` : ''}</tr></tfoot>
       </table>
       <div class="exp">
-        <div><h3>Ανάλυση εξόδων πολυκατοικίας</h3><div class="list">${exp || '<span class="muted">Δεν υπάρχουν έξοδα.</span>'}</div></div>
+        <div><h3>ΑΝΑΛΥΣΗ ΣΥΝΟΛΙΚΩΝ ΕΞΟΔΩΝ ΠΟΛΥΚΑΤΟΙΚΙΑΣ</h3><div class="list">${exp || '<span class="muted">Δεν υπάρχουν έξοδα.</span>'}</div></div>
         <div class="sumbox">
           <span>Έξοδα μήνα</span><b class="num">${e(t.charges)}</b>
-          <span>Προηγούμενα υπόλοιπα</span><b class="num">${e(t.prevBalance)}</b>
+          <span>Προηγούμενες οφειλές</span><b class="num">${e(t.prevBalance)}</b>
           <span class="g">Προς είσπραξη</span><span class="g num">${e(t.total)}</span>
         </div>
       </div>
-      <div class="foot"><span>Χιλιοστά βάσει τετραγωνικών · Ασανσέρ με συντελεστή ορόφου · Θέρμανση: ${f0(comp.fixedPct)}% πάγιο με χιλιοστά, ${f0(100 - comp.fixedPct)}% με χιλιοστά × χρήση</span><span>Εκδόθηκε ${new Date().toLocaleDateString('el-GR')}</span></div>
+      <div class="foot">Εκδόθηκε ${new Date().toLocaleDateString('el-GR')}</div>
     </section></body></html>`;
   }
 
@@ -122,97 +102,86 @@
     const note = building.note === undefined ? C.DEFAULT_NOTE : building.note;
     const showOverview = building.receiptOverview !== false;
     const only = opts.onlyId ? results.filter((r) => r.id === opts.onlyId) : results;
-
-    const overview = showOverview ? `<div class="ov"><h3>Κατάσταση πολυκατοικίας</h3><table>
-      <thead><tr><th class="l">Διαμ.</th><th class="l">Ένοικος</th><th>Θέρμανση</th><th>Ασανσέρ</th><th>Γενικά</th><th>Σύνολο</th></tr></thead>
-      <tbody>${results.map((r) => `<tr class="__ID_${esc(r.id)}"><td>${esc(r.apt.code)}</td><td class="own">${esc(r.apt.owner)}</td><td class="num">${m(r.heating)}</td><td class="num">${m(r.elevator)}</td><td class="num">${m(r.general)}</td><td class="num"><b>${m(r.total)}</b></td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="2">Σύνολο</td><td class="num">${m(t.heating)}</td><td class="num">${m(t.elevator)}</td><td class="num">${m(t.general)}</td><td class="num">${m(t.total)}</td></tr></tfoot>
-    </table></div>` : '';
+    const analysis = expenseList(t, oil).map(([l, v]) => `<div class="kv"><span>${esc(l)}:</span><b class="num">${e(v)}</b></div>`).join('');
 
     const pages = only.map((r) => {
-      const lines = [];
-      C.EXPENSES.forEach((x) => { if (t.expenses[x.key] > 0) lines.push([x.label, t.expenses[x.key], r.breakdown[x.key], `${f2(r.mils)}‰`]); });
-      if (t.expenses.elevator > 0) lines.push(['Ανελκυστήρας', t.expenses.elevator, r.elevator, r.apt.noElevator ? 'εξαιρείται' : `${f2(r.elevMils)}‰`]);
-      if (oil.costCents > 0) {
-        lines.push([`Θέρμανση — πάγιο ${f0(comp.fixedPct)}%`, t.fixedPool, r.heatingFixed, r.apt.noHeating ? 'εξαιρείται' : `${f2(r.mils)}‰`]);
-        lines.push([`Θέρμανση — χρήση ${f0(100 - comp.fixedPct)}%`, t.variablePool, r.heatingVariable, r.apt.noHeating ? 'εξαιρείται' : `${f2(r.units)} μον.`]);
-      }
-      const body = lines.map(([l, all, share, basis]) => `<tr><td>${esc(l)}</td><td class="num muted">${m(all)}</td><td class="c muted">${esc(basis)}</td><td class="num">${m(share)}</td></tr>`).join('');
-      const ov = overview.replace(`class="__ID_${esc(r.id)}"`, 'class="me"').replace(/ class="__ID_[^"]*"/g, '');
+      const items = [];
+      if (r.prevBalance !== 0) items.push([r.prevBalance > 0 ? 'Προηγούμενη οφειλή' : 'Πιστωτικό υπόλοιπο', r.prevBalance]);
+      C.EXPENSES.forEach((x) => { if (r.breakdown[x.key] > 0) items.push([x.label, r.breakdown[x.key]]); });
+      if (oil.costCents > 0 && !r.apt.noHeating) { items.push(['Πάγιο θέρμανσης', r.heatingFixed]); items.push(['Χρήση θέρμανσης', r.heatingVariable]); }
+      if (t.expenses.elevator > 0 && !r.apt.noElevator) items.push(['Ασανσέρ', r.elevator]);
+      const body = items.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="num">${m(v)}</td></tr>`).join('');
+
+      const overview = showOverview ? `<div class="ov"><h3>ΤΙ ΠΛΗΡΩΝΕΙ ΚΑΘΕ ΔΙΑΜΕΡΙΣΜΑ</h3><table>
+        <thead><tr><th class="l">Διαμ.</th><th class="l">Ένοικος</th><th>Θέρμ.</th><th>Ασαν.</th><th>Κοιν.</th><th>Σύνολο</th></tr></thead>
+        <tbody>${results.map((x) => `<tr${x.id === r.id ? ' class="me"' : ''}><td>${esc(x.apt.code)}</td><td class="own">${esc(x.apt.owner)}</td><td class="num">${m(x.heating)}</td><td class="num">${m(x.elevator)}</td><td class="num">${m(x.general)}</td><td class="num">${m(x.charges)}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td colspan="2">Σύνολο</td><td class="num">${m(t.heating)}</td><td class="num">${m(t.elevator)}</td><td class="num">${m(t.general)}</td><td class="num">${m(t.charges)}</td></tr></tfoot>
+      </table><div class="ovnote">Τα ποσά είναι τα έξοδα του μήνα, χωρίς προηγούμενες οφειλές.</div></div>` : '';
+
       return `<section class="page">
-        ${header(building, period, 'Ειδοποιητήριο κοινοχρήστων')}
-        <div class="who">
-          <div><small>Διαμέρισμα</small><b class="serif">${esc(r.apt.code)}</b></div>
-          <div class="grow"><small>Ένοικος / Υπόχρεος</small><b class="serif">${esc(r.apt.owner || '—')}</b></div>
-          <div><small>Όροφος</small><b>${esc(C.floorLabel(r.apt.floor))}</b></div>
-          <div><small>τ.μ.</small><b class="num">${f2(r.apt.sqm)}</b></div>
-          <div><small>Χιλιοστά</small><b class="num">${f2(r.mils)}</b></div>
-          <div><small>Χιλ. ασανσέρ</small><b class="num">${f2(r.elevMils)}</b></div>
+        <h1>ΕΙΔΟΠΟΙΗΤΗΡΙΟ ΚΟΙΝΟΧΡΗΣΤΩΝ: ${esc(building.name)}</h1>
+        <div class="meta">Περίοδος: ${esc(C.periodLabel(period))}${building.address ? ' · ' + esc(building.address) : ''}</div>
+        <div class="owner">Υπόχρεος: ${esc(up(r.apt.owner || '—'))}</div>
+        <div class="oil">
+          <div class="cap">ΣΤΟΙΧΕΙΑ ΠΕΤΡΕΛΑΙΟΥ ΠΟΛΥΚΑΤΟΙΚΙΑΣ</div>
+          <div>Αρχή: ${f2(oil.startL)} lt | Αγορές: ${purchasesText(oil)} lt | Τέλος: ${oil.endL === null ? '—' : f2(oil.endL) + ' lt'} | Μέση τιμή: ${f3(oil.avgPrice)} €/lt</div>
+          <div><b>Συνολική κατανάλωση: ${f2(oil.consumedL)} lt</b></div>
         </div>
         <div class="cols">
-          <div>
-            <table class="ch"><thead><tr><th class="l">Περιγραφή</th><th>Σύνολο πολ/κίας</th><th class="c">Βάση</th><th>Αναλογεί</th></tr></thead>
-            <tbody>${body || '<tr><td colspan="4" class="muted">Δεν υπάρχουν χρεώσεις αυτόν τον μήνα.</td></tr>'}</tbody>
-            <tfoot>
-              <tr><td colspan="3">Έξοδα μήνα</td><td class="num">${m(r.charges)}</td></tr>
-              ${r.prevBalance !== 0 ? `<tr><td colspan="3">${r.prevBalance > 0 ? 'Προηγούμενη οφειλή' : 'Πιστωτικό υπόλοιπο'}</td><td class="num">${m(r.prevBalance)}</td></tr>` : ''}
-            </tfoot></table>
+          <div class="apt">
+            <div class="ah">ΔΙΑΜΕΡΙΣΜΑ: ${esc(r.apt.code)} (${esc(C.floorLabel(r.apt.floor))})</div>
+            <div class="sub">Χιλ.: ${f0(r.mils)} | Χιλ. Ασανσέρ: ${f0(r.elevMils)}</div>
+            <div class="sub">Παλαιά ένδειξη: ${f2(r.prevUnits)} | Νέα ένδειξη: ${r.currUnits === null ? '—' : f2(r.currUnits)} | Χρήση: ${f2(r.units)}</div>
+            <table class="ch"><thead><tr><th class="l">ΠΕΡΙΓΡΑΦΗ</th><th>ΠΟΣΟ</th></tr></thead>
+              <tbody>${body || '<tr><td colspan="2" class="muted">Καμία χρέωση.</td></tr>'}</tbody>
+              <tfoot><tr><td>Σύνολο:</td><td class="num">${e(r.total)}</td></tr></tfoot></table>
           </div>
-          <aside class="side">
-            <h3>Θερμιδομετρητής</h3>
-            <div class="kv"><span>Παλιά ένδειξη</span><b class="num">${f2(r.prevUnits)}</b></div>
-            <div class="kv"><span>Νέα ένδειξη</span><b class="num">${r.currUnits === null ? '—' : f2(r.currUnits)}</b></div>
-            <div class="kv"><span>Χρήση</span><b class="num">${f2(r.units)}</b></div>
-            <h3>Πετρέλαιο πολυκατοικίας</h3>
-            <div class="kv"><span>Αρχή</span><b class="num">${f2(oil.startL)} lt</b></div>
-            ${oil.purchases.map((p) => `<div class="kv"><span>Αγορά${p.date ? ' ' + esc(new Date(p.date).toLocaleDateString('el-GR')) : ''}</span><b class="num">${f2(p.liters)} lt × ${C.fmt(p.price, 3)}</b></div>`).join('')}
-            <div class="kv"><span>Τέλος</span><b class="num">${oil.endL === null ? '—' : f2(oil.endL) + ' lt'}</b></div>
-            <div class="kv"><span>Κατανάλωση</span><b class="num accent">${f2(oil.consumedL)} lt</b></div>
-            <div class="kv"><span>Μέση τιμή</span><b class="num">${C.fmt(oil.avgPrice, 3)} €/lt</b></div>
-          </aside>
+          <div class="side"><h3>ΑΝΑΛΥΣΗ ΕΞΟΔΩΝ ΠΟΛ/ΚΙΑΣ</h3>${analysis || '<span class="muted">—</span>'}</div>
         </div>
+        ${overview}
         <div class="pay">
-          <div><small>Ποσό προς εξόφληση</small>${note ? `<p>${esc(note)}</p>` : ''}</div>
-          <b class="serif num">${e(r.total)}</b>
+          ${note ? `<div class="note">${esc(note)}</div>` : ''}
+          <div class="amt"><span>ΣΥΝΟΛΙΚΟ ΠΟΣΟ ΠΡΟΣ ΕΞΟΦΛΗΣΗ:</span><b class="num">${e(r.total)}</b></div>
         </div>
-        ${ov}
       </section>`;
     }).join('');
 
     const css = BASE_CSS + `
-      @page{size:A4;margin:14mm 14mm 12mm}
-      @media screen{.page{width:210mm;min-height:297mm;padding:14mm}}
-      .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1c2130;padding-bottom:9px}
-      .kind{font-size:7.5pt;letter-spacing:.14em;text-transform:uppercase;color:#b5532c;font-weight:700}
-      h1{font-size:20pt;font-weight:600}.per{text-align:right}.pm{font-size:15pt;font-weight:600}
-      .who{display:flex;gap:0;margin:12px 0 14px;border:1px solid #d9d2c3;border-radius:6px;overflow:hidden}
-      .who div{padding:7px 10px;border-right:1px solid #e3ddd0;background:#f7f4ee}
-      .who div:last-child{border-right:0}.who .grow{flex:1;background:#fff}
-      .who small{display:block;font-size:6.8pt;color:#6b7080;text-transform:uppercase;letter-spacing:.07em}
-      .who b{font-size:11.5pt}
-      .cols{display:grid;grid-template-columns:1fr 54mm;gap:12px}
-      .ch th{font-size:7pt;text-transform:uppercase;letter-spacing:.05em;color:#6b7080;border-bottom:1.5px solid #1c2130;padding:4px 5px;text-align:right;font-weight:700}
-      .ch th.l{text-align:left}.ch th.c,.ch td.c{text-align:center}
-      .ch td{padding:5px;border-bottom:1px solid #ebe6dc}
-      .ch tfoot td{font-weight:700;border-bottom:0;padding-top:6px}
-      .ch tfoot tr:first-child td{border-top:1px solid #1c2130}
-      .side{background:#f7f4ee;border-radius:6px;padding:8px 10px;font-size:8.3pt;align-self:start}
-      .side h3{font-size:7pt;text-transform:uppercase;letter-spacing:.1em;color:#6b7080;margin:2px 0 4px}
-      .side h3:not(:first-child){margin-top:10px}
-      .kv{display:flex;justify-content:space-between;gap:8px;padding:1.5px 0;border-bottom:1px dotted #d9d2c3}
-      .pay{margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;border:1.5px solid #b5532c;background:#fbf0e9;border-radius:7px;padding:11px 16px}
-      .pay small{font-size:8pt;text-transform:uppercase;letter-spacing:.12em;color:#8f3f1f;font-weight:700}
-      .pay p{margin:4px 0 0;color:#4a5163;font-size:8.5pt;max-width:110mm}
-      .pay b{font-size:23pt;color:#8f3f1f;font-weight:600}
-      .ov{margin-top:16px}
-      .ov h3{font-size:7pt;text-transform:uppercase;letter-spacing:.1em;color:#6b7080;margin-bottom:4px}
+      @page{size:A4;margin:14mm 15mm 12mm}
+      @media screen{.page{width:210mm;min-height:297mm;padding:14mm 15mm}}
+      h1{font-size:13pt;font-weight:700}
+      .meta{margin-top:3px;font-size:9pt}
+      .owner{margin-top:6px;font-size:11pt;font-weight:700}
+      .oil{margin-top:10px;border:.75px solid #888;padding:5px 9px;font-size:8.3pt;display:grid;gap:1px}
+      .cap{font-size:7.5pt;font-weight:700}
+      .cols{display:grid;grid-template-columns:1fr 58mm;gap:16px;margin-top:12px;align-items:start}
+      .apt{border:.75px solid #000;padding:8px 10px}
+      .ah{font-weight:700;font-size:9.5pt}
+      .sub{font-size:8pt;margin-top:2px}
+      .ch{margin-top:8px;font-size:8.6pt}
+      .ch th{font-size:7.3pt;font-weight:700;text-align:right;border-bottom:.75px solid #000;padding:2px 4px}
+      .ch th.l{text-align:left}
+      .ch td{padding:2.5px 4px;border-bottom:.5px dotted #aaa}
+      .ch tfoot td{font-weight:700;font-size:9.5pt;border-top:.75px solid #000;border-bottom:0;padding-top:5px}
+      .side{font-size:8pt;padding-top:2px}
+      .side h3{font-size:8.3pt;font-weight:700;text-decoration:underline;margin-bottom:5px}
+      .kv{display:flex;justify-content:space-between;gap:8px;padding:1px 0}
+      .ov{margin-top:14px}
+      .ov h3{font-size:8.3pt;font-weight:700;text-decoration:underline;margin-bottom:4px}
       .ov table{font-size:7.4pt}
-      .ov th{text-align:right;font-weight:600;color:#6b7080;border-bottom:1px solid #b9b2a3;padding:2px 4px}.ov th.l{text-align:left}
-      .ov td{padding:2px 4px;border-bottom:1px solid #efebe3}
-      .ov td.own{max-width:60mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .ov tr.me td{background:#f8e6db;font-weight:700}
-      .ov tfoot td{font-weight:700;border-top:1px solid #b9b2a3;border-bottom:0}
-      tr,.pay,.who{break-inside:avoid}
+      .ov th{text-align:right;font-weight:700;border-bottom:.75px solid #000;padding:1.5px 4px}.ov th.l{text-align:left}
+      .ov td{padding:1.5px 4px;border-bottom:.5px solid #ddd}
+      .ov td.own{max-width:70mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .ov tr.me td{font-weight:700}
+      .ov tr.me td:first-child::before{content:"► ";font-size:6pt}
+      .ov tfoot td{font-weight:700;border-top:.75px solid #000;border-bottom:0}
+      .ovnote{font-size:6.8pt;color:#555;margin-top:2px}
+      .pay{margin-top:14px;border:.75px solid #000;padding:8px 12px}
+      .note{font-size:8.5pt;font-weight:700;margin-bottom:6px}
+      .amt{display:flex;justify-content:space-between;align-items:baseline;gap:16px}
+      .amt span{font-size:11pt;font-weight:700}
+      .amt b{font-size:15pt}
+      tr,.pay,.apt,.oil{break-inside:avoid}
     `;
     return `<!doctype html><html lang="el"><head><meta charset="utf-8"><title>Ειδοποιητήρια</title><style>${css}</style></head><body>${pages || '<p>Δεν υπάρχουν διαμερίσματα.</p>'}</body></html>`;
   }
