@@ -168,7 +168,9 @@
       const elevator = elevatorShares[i];
       const charges = heatingFixed + heatingVariable + elevator + general;
       const prevBalance = toCents(r.prevBalance);
-      const total = charges + prevBalance;
+      // Χειροκίνητη διόρθωση οφειλής (π.χ. πίστωση λόγω λάθους): θετική = χρέωση, αρνητική = πίστωση.
+      const adjust = toCents(r.adjust);
+      const total = charges + prevBalance + adjust;
       const payment = toCents(r.payment);
       return {
         id: a.id, apt: a,
@@ -176,7 +178,7 @@
         prevUnits: num(r.prevUnits), currUnits: r.currUnits === '' || r.currUnits == null ? null : num(r.currUnits),
         units: cons[i].units,
         heatingFixed, heatingVariable, heating: heatingFixed + heatingVariable,
-        elevator, general, breakdown, charges, prevBalance, total, payment, newBalance: total - payment
+        elevator, general, breakdown, charges, prevBalance, adjust, adjustNote: r.adjustNote || '', total, payment, newBalance: total - payment
       };
     });
 
@@ -186,7 +188,7 @@
     const totals = {
       sqm: totalSqm, mils: mils.reduce((a, b) => a + b, 0), elevMils: elevMils.reduce((a, b) => a + b, 0),
       units: sum('units'), heatingFixed: sum('heatingFixed'), heatingVariable: sum('heatingVariable'), heating: sum('heating'),
-      elevator: sum('elevator'), general: sum('general'), charges: sum('charges'), prevBalance: sum('prevBalance'),
+      elevator: sum('elevator'), general: sum('general'), charges: sum('charges'), prevBalance: sum('prevBalance'), adjust: sum('adjust'),
       total: sum('total'), payment: sum('payment'), newBalance: sum('newBalance'),
       oilCost: oil.costCents, fixedPool, variablePool, expenses: expenseTotals,
       expensesSum: Object.values(expenseTotals).reduce((a, b) => a + b, 0)

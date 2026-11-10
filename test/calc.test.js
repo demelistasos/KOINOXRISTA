@@ -117,3 +117,16 @@ test('apartments excluded from heating or elevator pay nothing for them', () => 
   assert.strictEqual(d.elevator, 0);
   assert.strictEqual(r.totals.heating, r.totals.oilCost);
 });
+
+test('manual debt adjustment (credit) enters total and carries via newBalance', () => {
+  const p = JSON.parse(JSON.stringify(period));
+  p.rows.c.adjust = '-25,40'; p.rows.c.adjustNote = 'Διόρθωση ΔΕΗ';
+  const r = C.compute(apts, p, {});
+  const c = r.results[2];
+  assert.strictEqual(c.adjust, -2540);
+  assert.strictEqual(c.total, c.charges + c.prevBalance - 2540);
+  assert.strictEqual(r.totals.total, r.totals.charges + r.totals.prevBalance + r.totals.adjust);
+  const next = C.rollover(p, r, [], () => 'id');
+  assert.strictEqual(C.toCents(next.rows.c.prevBalance), c.newBalance);
+  assert.strictEqual(next.rows.c.adjust, undefined);
+});

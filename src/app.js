@@ -330,6 +330,7 @@
         ${cell('prevUnits', '0')}${cell('currUnits', '—')}
         <td class="r" data-out="r:${a.id}:units"></td>
         ${dis || derivedIds.has(a.id) ? `<td class="r" data-out="r:${a.id}:prevBalance"></td>` : cell('prevBalance', '0,00')}
+        ${dis ? `<td class="r" data-out="r:${a.id}:adjust" title="${esc(r.adjustNote || '')}"></td>` : `<td class="adj"><input class="inp n" inputmode="decimal" data-root="p" data-path="rows.${a.id}.adjust" value="${esc(r.adjust ?? '')}" placeholder="0,00" aria-label="Διόρθωση οφειλής"><input class="inp note" data-root="p" data-path="rows.${a.id}.adjustNote" value="${esc(r.adjustNote ?? '')}" placeholder="αιτία" aria-label="Αιτία διόρθωσης"></td>`}
         <td class="r strong" data-out="r:${a.id}:total"></td>
         ${dis ? `<td class="r" data-out="r:${a.id}:payment"></td><td class="r" data-out="r:${a.id}:newBalance"></td>` : ''}
       </tr>`;
@@ -371,9 +372,9 @@
       <section class="card full">
         <div class="card-h"><h2>Ενδείξεις & λογαριασμοί</h2><span class="hint">${prevP ? `Η προηγούμενη οφειλή έρχεται από τις εισπράξεις ${MONTHS_GEN[prevP.month]}` : 'Στον πρώτο μήνα γράψε τυχόν παλιές οφειλές'}</span></div>
         <div class="card-b" style="padding-top:8px">${apts.length ? `<div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Διαμ.</th><th>Ένοικος</th><th>Όροφ.</th><th class="r">Παλιά</th><th class="r">Νέα</th><th class="r">Χρήση</th><th class="r">Προηγ. οφειλή</th><th class="r">Σύνολο</th>${dis ? '<th class="r">Πληρωμή</th><th class="r">Υπόλοιπο</th>' : ''}</tr></thead>
+          <thead><tr><th>Διαμ.</th><th>Ένοικος</th><th>Όροφ.</th><th class="r">Παλιά</th><th class="r">Νέα</th><th class="r">Χρήση</th><th class="r">Προηγ. οφειλή</th><th class="r" title="Χειροκίνητη διόρθωση: θετικό = χρέωση, αρνητικό (με −) = πίστωση">Διόρθωση ±</th><th class="r">Σύνολο</th>${dis ? '<th class="r">Πληρωμή</th><th class="r">Υπόλοιπο</th>' : ''}</tr></thead>
           <tbody>${rowsHtml}</tbody>
-          <tfoot><tr><td colspan="5">Σύνολα</td><td class="r" data-out="tf:units"></td><td class="r" data-out="tf:prevBalance"></td><td class="r" data-out="tf:total"></td>${dis ? '<td class="r" data-out="tf:payment"></td><td class="r" data-out="tf:newBalance"></td>' : ''}</tr></tfoot>
+          <tfoot><tr><td colspan="5">Σύνολα</td><td class="r" data-out="tf:units"></td><td class="r" data-out="tf:prevBalance"></td><td class="r" data-out="tf:adjust"></td><td class="r" data-out="tf:total"></td>${dis ? '<td class="r" data-out="tf:payment"></td><td class="r" data-out="tf:newBalance"></td>' : ''}</tr></tfoot>
         </table></div>` : `<div class="empty"><b>Δεν υπάρχουν διαμερίσματα</b>Πρόσθεσέ τα από την καρτέλα «Διαμερίσματα».<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="apartments">Πήγαινε στα διαμερίσματα</button></div></div>`}</div>
       </section>`;
   }

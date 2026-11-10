@@ -40,7 +40,8 @@
     // Οικονομία μελανιού: ό,τι είναι μηδέν σε όλη την πολυκατοικία δεν τυπώνεται.
     const hasHeat = oil.costCents > 0;
     const hasElev = t.elevator > 0;
-    const hasPrev = results.some((r) => r.prevBalance !== 0);
+    const prevOf = (r) => r.prevBalance + (r.adjust || 0);
+    const hasPrev = results.some((r) => prevOf(r) !== 0);
     const H = (x) => (hasHeat ? x : '');
     const E = (x) => (hasElev ? x : '');
     const P = (x) => (hasPrev ? x : '');
@@ -48,7 +49,7 @@
       <td class="l">${esc(r.apt.owner)} (${esc(r.apt.code)})</td><td>${f2(r.apt.sqm)}</td><td>${f0(r.mils)}</td>${E(`<td>${f0(r.elevMils)}</td>`)}
       ${H(`<td>${f2(r.prevUnits)}</td><td>${r.currUnits === null ? '—' : f2(r.currUnits)}</td><td>${f2(r.units)}</td>
       <td>${m(r.heatingFixed)}</td><td>${m(r.heatingVariable)}</td><td>${m(r.heating)}</td>`)}${E(`<td>${m(r.elevator)}</td>`)}<td>${m(r.general)}</td>
-      ${P(`<td>${m(r.prevBalance)}</td>`)}<td class="b">${m(r.total)}</td>
+      ${P(`<td>${m(prevOf(r))}</td>`)}<td class="b">${m(r.total)}</td>
       ${showPay ? `<td>${m(r.payment)}</td><td class="b">${m(r.newBalance)}</td>` : ''}
     </tr>`).join('');
     const exp = expenseList(t, oil).map(([l, v]) => `<div><span>${esc(l)}:</span><b class="num">${e(v)}</b></div>`).join('');
@@ -86,14 +87,14 @@
         </tr></thead>
         <tbody>${rows}</tbody>
         <tfoot><tr><td class="l">ΣΥΝΟΛΑ:</td><td>${f2(t.sqm)}</td><td>${f0(t.mils)}</td>${E(`<td>${f0(t.elevMils)}</td>`)}${H(`<td></td><td></td><td>${f2(t.units)}</td>
-          <td>${m(t.heatingFixed)}</td><td>${m(t.heatingVariable)}</td><td>${m(t.heating)}</td>`)}${E(`<td>${m(t.elevator)}</td>`)}<td>${m(t.general)}</td>${P(`<td>${m(t.prevBalance)}</td>`)}<td>${m(t.total)}</td>
+          <td>${m(t.heatingFixed)}</td><td>${m(t.heatingVariable)}</td><td>${m(t.heating)}</td>`)}${E(`<td>${m(t.elevator)}</td>`)}<td>${m(t.general)}</td>${P(`<td>${m(t.prevBalance + (t.adjust || 0))}</td>`)}<td>${m(t.total)}</td>
           ${showPay ? `<td>${m(t.payment)}</td><td>${m(t.newBalance)}</td>` : ''}</tr></tfoot>
       </table>
       <div class="exp">
         <div><h3>ΑΝΑΛΥΣΗ ΣΥΝΟΛΙΚΩΝ ΕΞΟΔΩΝ ΠΟΛΥΚΑΤΟΙΚΙΑΣ</h3><div class="list">${exp || '<span class="muted">Δεν υπάρχουν έξοδα.</span>'}</div></div>
         <div class="sumbox">
           <span>Έξοδα μήνα</span><b class="num">${e(t.charges)}</b>
-          ${hasPrev ? `<span>Προηγούμενες οφειλές</span><b class="num">${e(t.prevBalance)}</b>` : ''}
+          ${hasPrev ? `<span>Προηγούμενες οφειλές${t.adjust ? ' / διορθώσεις' : ''}</span><b class="num">${e(t.prevBalance + (t.adjust || 0))}</b>` : ''}
           <span class="g">Προς είσπραξη</span><span class="g num">${e(t.total)}</span>
         </div>
       </div>
@@ -134,6 +135,7 @@
     const aptBox = (r) => {
       const items = [];
       if (r.prevBalance !== 0) items.push([r.prevBalance > 0 ? 'Προηγούμενη οφειλή' : 'Πιστωτικό υπόλοιπο', r.prevBalance]);
+      if (r.adjust) items.push([(r.adjust > 0 ? 'Διόρθωση' : 'Πίστωση') + (r.adjustNote ? ': ' + r.adjustNote : ''), r.adjust]);
       C.EXPENSES.forEach((x) => { if (r.breakdown[x.key] > 0) items.push([x.label, r.breakdown[x.key]]); });
       if (r.heatingFixed > 0) items.push(['Πάγιο θέρμανσης', r.heatingFixed]);
       if (r.heatingVariable > 0) items.push(['Χρήση θέρμανσης', r.heatingVariable]);
@@ -150,7 +152,7 @@
     };
     const side = `<div class="side"><h3>ΑΝΑΛΥΣΗ ΕΞΟΔΩΝ ΠΟΛ/ΚΙΑΣ</h3>${analysis || '<span class="muted">—</span>'}</div>`;
 
-    const pages = groups.map((g) => {
+    const pages = groups.filter((g) => g.list.some((r) => r.total !== 0 || r.charges !== 0)).map((g) => {
       const grand = g.list.reduce((a, r) => a + r.total, 0);
       const multi = g.list.length > 1;
       const overview = showOverview ? `<div class="ov"><h3>ΑΝΑΛΥΣΗ ΑΝΑ ΕΝΟΙΚΟ</h3><table>
