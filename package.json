@@ -1,7 +1,7 @@
 {
   "name": "koinoxrista",
   "productName": "Κοινόχρηστα",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Υπολογισμός κοινοχρήστων πολυκατοικίας — Windows & macOS",
   "main": "main.js",
   "author": "Tasos Demelis",
@@ -21,20 +21,52 @@
   "build": {
     "appId": "com.tasos.koinoxrista",
     "productName": "Κοινόχρηστα",
-    "artifactName": "Koinoxrista-${version}-${os}-${arch}.${ext}",
-    "files": ["main.js", "preload.js", "src/**/*", "package.json"],
-    "directories": { "buildResources": "build", "output": "dist" },
+    "files": [
+      "main.js",
+      "preload.js",
+      "updater.js",
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
     "mac": {
       "category": "public.app-category.finance",
       "icon": "build/icon.png",
-      "target": [{ "target": "dmg", "arch": ["universal"] }]
+      "identity": "-",
+      "artifactName": "Koinoxrista-Mac-${version}.${ext}",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ]
     },
     "win": {
       "icon": "build/icon.png",
-      "target": [{ "target": "nsis", "arch": ["x64"] }]
+      "artifactName": "Koinoxrista-Windows-${version}-Setup.${ext}",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "Κοινόχρηστα"
     }

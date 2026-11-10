@@ -13,5 +13,11 @@ contextBridge.exposeInMainWorld('api', {
   openPdfDir: (dir) => ipcRenderer.invoke('pdf:openDir', dir),
   reveal: (p) => ipcRenderer.invoke('file:reveal', p),
   confirm: (opts) => ipcRenderer.invoke('confirm', opts),
-  onMenu: (cb) => ipcRenderer.on('menu', (_e, cmd) => cb(cmd))
+  onMenu: (cb) => ipcRenderer.on('menu', (_e, cmd) => cb(cmd)),
+  appVersion: () => ipcRenderer.invoke('update:version'),
+  checkUpdates: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  justUpdated: () => ipcRenderer.invoke('update:justUpdated'),
+  openUpdateLog: () => ipcRenderer.invoke('update:openLog'),
+  onUpdate: (cb) => ipcRenderer.on('update:status', (_e, s) => cb(s))
 });

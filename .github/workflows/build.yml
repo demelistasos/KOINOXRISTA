@@ -1,52 +1,157 @@
-name: Build
+name: Build Κοινόχρηστα (Windows και Mac)
 
+# Σε κάθε αλλαγή στο main φτιάχνεται νέα έκδοση 2.2.<αριθμός εκτέλεσης> και ανεβαίνει στα Releases με:
+#   Koinoxrista-Windows-<V>-Setup.exe   (εγκατάσταση ΚΑΙ αυτόματη ενημέρωση στα Windows)
+#   Koinoxrista-Mac-<V>.dmg             (πρώτη εγκατάσταση στο Mac)
+#   Koinoxrista-Mac-<V>.zip             (αυτόματη ενημέρωση στο Mac)
+#   SHA256SUMS.txt                      (η εφαρμογή ελέγχει ότι κατέβηκαν σωστά)
+#
+# Το Mac χτίζεται ταυτόχρονα σε δύο είδη Mac του GitHub (Apple Silicon και Intel), γιατί συχνά δεν
+# υπάρχουν διαθέσιμα. Αρκεί να πετύχει ένα. Αν δεν πετύχει κανένα, η έκδοση βγαίνει χωρίς Mac.
+# Τότε: Actions → Run workflow και γράψε την έκδοση στο «mac_for_version» για να προστεθεί το Mac.
+#
+# Για νέα «μεγάλη» έκδοση αλλάζεις το 2.2 στη γραμμή V παρακάτω (π.χ. 2.3).
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths-ignore:
+      - '**.md'
   workflow_dispatch:
+    inputs:
+      mac_for_version:
+        description: 'Μόνο Mac για υπάρχουσα έκδοση (π.χ. 2.2.7). Άφησε κενό για νέα κανονική έκδοση.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  V: ${{ inputs.mac_for_version || format('2.2.{0}', github.run_number) }}
+  SRC_REF: ${{ inputs.mac_for_version && format('v{0}', inputs.mac_for_version) || github.sha }}
+
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+  test:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SRC_REF }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Δοκιμές υπολογισμών
+        run: node --test test/calc.test.js
+      - name: Έλεγχος σύνταξης
+        run: for f in main.js preload.js updater.js src/*.js; do node --check "$f"; done
+
+  build-windows:
+    needs: test
+    if: ${{ !inputs.mac_for_version }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SRC_REF }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm install
-      - run: npm test
-      - name: Build installer
-        run: npx electron-builder --publish never
+      - name: Αριθμός έκδοσης
+        shell: bash
+        run: npm version "$V" --no-git-tag-version --allow-same-version
+      - run: npx electron-builder --win --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/upload-artifact@v4
         with:
-          name: koinoxrista-${{ matrix.os }}
-          path: |
-            dist/*.exe
-            dist/*.dmg
+          name: dist-windows
           if-no-files-found: error
-      - name: Read version
-        id: ver
-        shell: bash
-        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-      # Δημιουργεί (ή ενημερώνει) το release vX.Y.Z από το package.json και επισυνάπτει τους installers.
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
+          path: dist/Koinoxrista-Windows-*-Setup.exe
+
+  build-mac:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.ver.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          name: Κοινόχρηστα ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.ver.outputs.tag }}
-          body: |
-            Λήψη: το **.exe** για Windows, το **.dmg** για Mac.
-            Στο Mac, την πρώτη φορά άνοιξε την εφαρμογή με δεξί κλικ → Άνοιγμα (δεν είναι υπογεγραμμένη).
-          files: |
-            dist/*.exe
-            dist/*.dmg
+          ref: ${{ env.SRC_REF }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Αριθμός έκδοσης
+        shell: bash
+        run: npm version "$V" --no-git-tag-version --allow-same-version
+      - run: npx electron-builder --mac --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-mac-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            dist/Koinoxrista-Mac-*.dmg
+            dist/Koinoxrista-Mac-*.zip
+
+  release:
+    needs: [test, build-windows, build-mac]
+    if: ${{ always() && !inputs.mac_for_version && needs.test.result == 'success' && needs.build-windows.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: in
+      - name: Δημοσίευση στα Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          find in -type f -ls
+          mkdir out
+          W="Koinoxrista-Windows-$V-Setup.exe"
+          cp "in/dist-windows/$W" out/ || { echo "Λείπει ο installer των Windows"; exit 1; }
+          MACDIR=$(ls -d in/dist-mac-* 2>/dev/null | while read d; do [ -f "$d/Koinoxrista-Mac-$V.zip" ] && echo "$d" && break; done)
+          if [ -n "$MACDIR" ]; then cp "$MACDIR/Koinoxrista-Mac-$V.zip" "$MACDIR/Koinoxrista-Mac-$V.dmg" out/; echo "Mac από: $MACDIR"
+          else echo "::warning::Δεν χτίστηκε Mac. Τρέξε ξανά με mac_for_version=$V"; fi
+          (cd out && sha256sum Koinoxrista-* > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          gh release create "v$V" out/* \
+            --repo "${{ github.repository }}" \
+            --title "Κοινόχρηστα $V" \
+            --target "${{ github.sha }}" \
+            --latest \
+            --notes "**Windows:** Koinoxrista-Windows-$V-Setup.exe · **Mac:** Koinoxrista-Mac-$V.dmg (την πρώτη φορά δεξί κλικ → Άνοιγμα). Αν έχεις ήδη την εφαρμογή (2.2 και μετά), ενημερώνεται μόνη της. Τα στοιχεία σου δεν χάνονται."
+
+  attach-mac:
+    needs: [test, build-mac]
+    if: ${{ always() && inputs.mac_for_version && needs.test.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-mac-*
+          path: in
+      - name: Προσθήκη του Mac στην έκδοση
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          find in -type f -ls
+          MACDIR=$(ls -d in/dist-mac-* 2>/dev/null | while read d; do [ -f "$d/Koinoxrista-Mac-$V.zip" ] && echo "$d" && break; done)
+          [ -n "$MACDIR" ] || { echo "Δεν χτίστηκε Mac. Δοκίμασε ξανά αργότερα."; exit 1; }
+          mkdir out && cp "$MACDIR/Koinoxrista-Mac-$V.zip" "$MACDIR/Koinoxrista-Mac-$V.dmg" out/
+          gh release download "v$V" --repo "$REPO" --pattern SHA256SUMS.txt --dir old
+          (grep -v "Koinoxrista-Mac-$V" old/SHA256SUMS.txt || true) > out/SHA256SUMS.txt
+          (cd out && sha256sum Koinoxrista-Mac-* >> SHA256SUMS.txt && cat SHA256SUMS.txt)
+          gh release upload "v$V" out/* --repo "$REPO" --clobber

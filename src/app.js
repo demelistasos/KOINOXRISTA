@@ -69,7 +69,19 @@
     return b.periods.find((p) => p.id === ui.pId) || b.periods[b.periods.length - 1];
   }
   const isLast = (b, p) => b.periods[b.periods.length - 1] === p;
-  const sortApts = (list) => list.slice().sort((a, c) => (C.num(a.floor) - C.num(c.floor)) || String(a.code).localeCompare(String(c.code), 'el', { numeric: true }));
+  // Σειρά διαμερισμάτων: η δική του (πεδίο order, από σύρσιμο) αν υπάρχει, αλλιώς όροφος και κωδικός.
+  const byFloor = (a, c) => (C.num(a.floor) - C.num(c.floor)) || String(a.code).localeCompare(String(c.code), 'el', { numeric: true });
+  const hasCustomOrder = (list) => list.length > 0 && list.every((a) => typeof a.order === 'number');
+  const sortApts = (list) => list.slice().sort(hasCustomOrder(list) ? (a, c) => a.order - c.order : byFloor);
+  // Μετακινεί το διαμέρισμα id στη θέση toIndex και γράφει τη νέα σειρά σε όλα.
+  function reorderApt(b, id, toIndex) {
+    const list = sortApts(b.apartments);
+    const from = list.findIndex((a) => a.id === id);
+    if (from < 0) return;
+    const [x] = list.splice(from, 1);
+    list.splice(Math.max(0, Math.min(list.length, toIndex)), 0, x);
+    list.forEach((a, i) => { a.order = i; });
+  }
   const aptsFor = (b, p) => sortApts(p.status === 'closed' && p.aptSnapshot ? p.aptSnapshot : b.apartments);
   const settingsFor = (b, p) => (p.status === 'closed' && p.settingsSnapshot ? p.settingsSnapshot : { elevatorFactors: b.elevatorFactors });
   function ensureRows(b, p) {
@@ -114,7 +126,10 @@
     up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V9m0 0-4 4m4-4 4 4M5 4h14"/></svg>',
     moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
     spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></svg>',
-    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>'
+    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    chevUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>',
+    chevDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/></svg>'
   };
 
   // ---------- βοηθητικά UI ----------
@@ -157,6 +172,49 @@
     else document.documentElement.setAttribute('data-theme', t);
   }
 
+  // ---------- ενημερώσεις εφαρμογής (πάντα με ερώτηση) ----------
+  const upd = { status: '', version: '', current: '', canAuto: false, url: '', percent: 0, later: false, reason: '' };
+  const UPD_WHY = {
+    programfiles: 'Η εφαρμογή είναι σε φάκελο όπου δεν μπορεί να γράψει μόνη της.',
+    readonly: 'Ο φάκελος της εφαρμογής δεν επιτρέπει αλλαγές.',
+    translocated: 'Το Mac τρέχει την εφαρμογή από προσωρινή θέση. Βάλε τα Κοινόχρηστα στις Εφαρμογές και άνοιξέ τα από εκεί· η επόμενη ενημέρωση θα γίνει με ένα κλικ.',
+    notbundle: 'Η εφαρμογή δεν τρέχει από τον φάκελο Εφαρμογές.',
+    noassets: 'Η νέα έκδοση δεν έχει ακόμα αρχεία για αυτόματη ενημέρωση σε αυτόν τον υπολογιστή.',
+    datainside: 'Τα στοιχεία σου είναι μέσα στον φάκελο του προγράμματος.'
+  };
+  function updLine() {
+    const v = upd.current ? 'Έκδοση ' + upd.current : 'Ενημερώσεις';
+    return ({ checking: v + ' · έλεγχος…', latest: v + ' · η πιο νέα', error: v + ' · χωρίς έλεγχο', available: v + ' · νέα ' + upd.version })[upd.status] || v;
+  }
+  function renderUpdate() {
+    const line = $('#updLine'); if (line) line.textContent = updLine();
+    let box = $('#updBox');
+    if (!box) { box = document.createElement('div'); box.id = 'updBox'; box.className = 'upd'; document.body.appendChild(box); }
+    const s = upd.status;
+    let html = '';
+    if (s === 'available' && !upd.later) {
+      html = upd.canAuto
+        ? `<b>Νέα έκδοση ${esc(upd.version)}</b><p>Τα Κοινόχρηστα μπορούν να ενημερωθούν τώρα. Τα στοιχεία σου δεν αλλάζουν.</p><div class="upd-a"><button class="btn sm ghost" data-act="update-later">Αργότερα</button><button class="btn sm primary" data-act="update-now">Ενημέρωση τώρα</button></div>`
+        : `<b>Νέα έκδοση ${esc(upd.version)}</b><p>${esc(UPD_WHY[upd.reason] || '')} Κατέβασέ την και εγκατάστησέ την πάνω από την τωρινή· τα στοιχεία σου δεν χάνονται.</p><div class="upd-a"><button class="btn sm ghost" data-act="update-later">Αργότερα</button><button class="btn sm primary" data-act="update-open">Κατέβασμα</button></div>`;
+    } else if (s === 'progress') {
+      html = `<b>Κατεβαίνει η έκδοση ${esc(upd.version)}…</b><div class="upd-bar"><i style="width:${upd.percent || 0}%"></i></div><p>${upd.percent || 0}% · μην κλείσεις τον υπολογιστή</p>`;
+    } else if (s === 'verifying') html = '<b>Έλεγχος του αρχείου…</b><div class="upd-bar"><i style="width:100%"></i></div>';
+    else if (s === 'installing') html = `<b>Μπαίνει η έκδοση ${esc(upd.version)}…</b><div class="upd-bar busy"><i></i></div>`;
+    else if (s === 'restarting') html = '<b>Τα Κοινόχρηστα κλείνουν και ξανανοίγουν…</b><div class="upd-bar busy"><i></i></div>';
+    else if (s === 'install-error') html = `<b class="owed">Η ενημέρωση δεν έγινε</b><p>${esc(upd.message || '')} Η τωρινή έκδοση συνεχίζει κανονικά.</p><div class="upd-a"><button class="btn sm ghost" data-act="update-log">Ημερολόγιο</button><button class="btn sm" data-act="update-open">Με το χέρι</button><button class="btn sm primary" data-act="update-now">Ξανά</button></div>`;
+    box.innerHTML = html;
+    box.classList.toggle('show', !!html);
+  }
+  async function updateNow() {
+    if (!api || !upd.canAuto) return;
+    const ok = await confirmBox({ title: `Ενημέρωση στην έκδοση ${upd.version}`, message: 'Η εφαρμογή θα κατεβάσει τη νέα έκδοση, θα <b>κλείσει</b> και θα <b>ξανανοίξει μόνη της</b>.<ul style="margin:8px 0 0;padding-left:18px"><li>Τα στοιχεία σου δεν αλλάζουν· πριν από την ενημέρωση κρατιέται και αντίγραφο.</li><li>Αν κάτι δεν πάει καλά, μένει η τωρινή έκδοση.</li></ul>', ok: 'Ενημέρωση τώρα' });
+    if (!ok) return;
+    await saveNow();
+    upd.status = 'progress'; upd.percent = 0; renderUpdate();
+    const r = await api.installUpdate();
+    if (r && !r.ok && r.error) toast(r.error);
+  }
+
   // ---------- rail ----------
   function renderRail() {
     const themeLabel = { system: 'Θέμα: σύστημα', light: 'Θέμα: φωτεινό', dark: 'Θέμα: σκούρο' }[data.prefs.theme || 'system'];
@@ -174,6 +232,7 @@
         <button class="rail-link" data-act="backup">${I.down}Αντίγραφο ασφαλείας</button>
         <button class="rail-link" data-act="restore">${I.up}Επαναφορά αντιγράφου</button>
         <button class="rail-link" data-act="theme">${I.moon}${themeLabel}</button>
+        <button class="rail-link" data-act="update-check">${I.refresh}<span id="updLine">${esc(updLine())}</span></button>
         <div class="save-state" id="saveState">${lastSaved ? 'Αποθηκεύτηκε ' + lastSaved.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' }) : 'Αποθηκεύεται αυτόματα'}</div>
       </div>`;
   }
@@ -381,9 +440,13 @@
   // ---------- καρτέλα: διαμερίσματα ----------
   function apartmentsTab(b, p) {
     const apts = sortApts(b.apartments);
-    const rows = apts.map((a) => `<tr>
+    const custom = hasCustomOrder(b.apartments);
+    const rows = apts.map((a, i) => `<tr data-apt="${a.id}">
+      <td class="grip-cell"><span class="grip" title="Σύρε για να αλλάξεις θέση" aria-hidden="true">⋮⋮</span><span class="mv">
+        <button class="icon-btn mini-btn" data-act="move-apt" data-id="${a.id}" data-dir="-1" aria-label="Μετακίνηση πάνω" ${i === 0 ? 'disabled' : ''}>${I.chevUp}</button>
+        <button class="icon-btn mini-btn" data-act="move-apt" data-id="${a.id}" data-dir="1" aria-label="Μετακίνηση κάτω" ${i === apts.length - 1 ? 'disabled' : ''}>${I.chevDown}</button></span></td>
       <td><input class="inp" data-root="a" data-path="${a.id}.code" value="${esc(a.code)}" placeholder="Α1" style="min-width:64px;width:80px"></td>
-      <td><input class="inp" data-root="a" data-path="${a.id}.owner" value="${esc(a.owner)}" placeholder="Ονοματεπώνυμο" style="min-width:200px"></td>
+      <td><input class="inp" data-root="a" data-path="${a.id}.owner" value="${esc(a.owner)}" placeholder="Ονοματεπώνυμο" style="min-width:160px"></td>
       <td><input class="inp n" inputmode="numeric" data-root="a" data-path="${a.id}.floor" value="${esc(a.floor)}" style="width:70px;min-width:0"></td>
       <td><input class="inp n" inputmode="decimal" data-root="a" data-path="${a.id}.sqm" value="${esc(a.sqm)}" placeholder="0" style="width:90px"></td>
       <td class="r" data-out="a:${a.id}:mils"></td>
@@ -394,15 +457,15 @@
       <td><button class="icon-btn" data-act="del-apt" data-id="${a.id}" aria-label="Διαγραφή διαμερίσματος">${I.trash}</button></td>
     </tr>`).join('');
     return `<section class="card">
-      <div class="card-h"><h2>Διαμερίσματα</h2><span class="hint">Οι αλλαγές ισχύουν για τον ανοιχτό μήνα· οι κλειστοί κρατούν τα στοιχεία τους</span></div>
+      <div class="card-h"><h2>Διαμερίσματα</h2><span class="hint">${custom ? `Δική σου σειρά · <button class="link" data-act="sort-floor">Ταξινόμηση κατά όροφο</button>` : 'Σύρε τις γραμμές από το ⋮⋮ για να τις βάλεις σε όποια σειρά θέλεις'}</span></div>
       <div class="card-b" style="padding-top:8px">
-        ${apts.length ? `<div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Κωδικός</th><th>Ένοικος</th><th>Όροφος</th><th>τ.μ.</th><th class="r">Χιλιοστά</th><th class="r">Συντ. ασ.</th><th class="r">Χιλ. ασανσέρ</th><th style="text-align:center">Χωρίς θέρμ.</th><th style="text-align:center">Χωρίς ασ.</th><th></th></tr></thead>
+        ${apts.length ? `<div class="tbl-wrap"><table class="tbl apts" id="aptTable">
+          <thead><tr><th></th><th>Κωδικός</th><th>Ένοικος</th><th>Όροφος</th><th>τ.μ.</th><th class="r">Χιλιοστά</th><th class="r">Συντ. ασ.</th><th class="r">Χιλ. ασανσέρ</th><th style="text-align:center">Χωρίς θέρμ.</th><th style="text-align:center">Χωρίς ασ.</th><th></th></tr></thead>
           <tbody>${rows}</tbody>
-          <tfoot><tr><td colspan="3">Σύνολα</td><td class="r" data-out="at:sqm"></td><td class="r" data-out="at:mils"></td><td></td><td class="r" data-out="at:elevMils"></td><td colspan="3"></td></tr></tfoot>
+          <tfoot><tr><td colspan="4">Σύνολα</td><td class="r" data-out="at:sqm"></td><td class="r" data-out="at:mils"></td><td></td><td class="r" data-out="at:elevMils"></td><td colspan="3"></td></tr></tfoot>
         </table></div>` : '<div class="empty"><b>Κανένα διαμέρισμα ακόμα</b>Ξεκίνα προσθέτοντας το πρώτο.</div>'}
         <button class="btn primary" data-act="add-apt" style="margin-top:14px">${I.plus}Νέο διαμέρισμα</button>
-        <p class="hint" style="color:var(--ink-3);font-size:12.5px;margin:14px 0 0">Όροφος: 0 για ισόγειο, −1 για υπόγειο. Τα χιλιοστά υπολογίζονται από τα τετραγωνικά· οι συντελεστές ασανσέρ αλλάζουν από τις Ρυθμίσεις.</p>
+        <p class="hint" style="color:var(--ink-3);font-size:12.5px;margin:14px 0 0">Όροφος: 0 για ισόγειο, −1 για υπόγειο. Τα χιλιοστά υπολογίζονται από τα τετραγωνικά· οι συντελεστές ασανσέρ αλλάζουν από τις Ρυθμίσεις. Η σειρά των διαμερισμάτων ισχύει παντού: στους πίνακες, στις εισπράξεις και στα PDF.</p>
       </div></section>`;
   }
 
@@ -537,9 +600,24 @@
       }
       case 'add-purchase': p.oil.purchases.push({ id: uid(), date: new Date().toISOString().slice(0, 10), liters: '', price: '' }); rerenderBody(); focusLast('[data-path$=".liters"]'); scheduleSave(); break;
       case 'del-purchase': p.oil.purchases.splice(Number(btn.dataset.i), 1); rerenderBody(); scheduleSave(); break;
+      case 'move-apt': {
+        const list = sortApts(b.apartments); const i = list.findIndex((a) => a.id === btn.dataset.id);
+        reorderApt(b, btn.dataset.id, i + Number(btn.dataset.dir));
+        rerenderBody(); scheduleSave();
+        const again = $(`[data-act="move-apt"][data-id="${btn.dataset.id}"][data-dir="${btn.dataset.dir}"]`);
+        if (again && !again.disabled) again.focus();
+        break;
+      }
+      case 'sort-floor': b.apartments.forEach((a) => { delete a.order; }); rerenderBody(); scheduleSave(); toast('Ταξινόμηση κατά όροφο'); break;
+      case 'update-check': if (api && api.checkUpdates) { const r = await api.checkUpdates(); if (r && r.status === 'dev') toast('Ο έλεγχος γίνεται μόνο στην εγκατεστημένη εφαρμογή'); } break;
+      case 'update-now': updateNow(); break;
+      case 'update-later': upd.later = true; renderUpdate(); break;
+      case 'update-open': window.open(upd.url, '_blank'); break;
+      case 'update-log': api && api.openUpdateLog && api.openUpdateLog(); break;
       case 'add-apt': {
         const maxF = b.apartments.reduce((m, x) => Math.max(m, Math.trunc(C.num(x.floor))), 0);
         const apt = { id: uid(), code: '', owner: '', floor: b.apartments.length ? maxF : 1, sqm: '' };
+        if (hasCustomOrder(b.apartments)) apt.order = Math.max(...b.apartments.map((x) => x.order)) + 1;
         b.apartments.push(apt); ensureRows(b, p); rerenderBody();
         const inp = $(`[data-path="${apt.id}.code"]`); if (inp) { inp.focus(); inp.scrollIntoView({ block: 'center' }); }
         renderRail(); scheduleSave(); break;
@@ -790,7 +868,54 @@
       if (all[i + 1]) { all[i + 1].focus(); all[i + 1].select && all[i + 1].select(); }
     });
     if (api && api.onMenu) api.onMenu((cmd) => { if (cmd === 'backup') backup(); if (cmd === 'restore') restore(); });
+    if (api && api.onUpdate) {
+      upd.current = await api.appVersion();
+      api.onUpdate((s) => { Object.assign(upd, s); if (s.status === 'available' && s.version !== upd.seen) { upd.seen = s.version; upd.later = false; } renderUpdate(); });
+      renderUpdate();
+      const j = await api.justUpdated();
+      if (j && j.to) toast(`Τα Κοινόχρηστα ενημερώθηκαν στην έκδοση ${j.to}`);
+      else if (j && j.failed) toast('Η τελευταία ενημέρωση δεν ολοκληρώθηκε· έμεινε η προηγούμενη έκδοση.');
+    }
+    setupDrag();
     window.addEventListener('beforeunload', () => { if (saveTimer) saveNow(); });
+  }
+
+  // ---------- σύρσιμο διαμερισμάτων ----------
+  function setupDrag() {
+    let dragId = null;
+    const clear = () => $$('.drop-before, .drop-after, .dragging').forEach((x) => x.classList.remove('drop-before', 'drop-after', 'dragging'));
+    document.addEventListener('mousedown', (e) => { const g = e.target.closest('.grip'); if (g) g.closest('tr').draggable = true; });
+    document.addEventListener('mouseup', () => $$('tr[draggable="true"]').forEach((tr) => { if (!tr.classList.contains('dragging')) tr.draggable = false; }));
+    document.addEventListener('dragstart', (e) => {
+      const tr = e.target.closest && e.target.closest('tr[data-apt]');
+      if (!tr || !tr.draggable) return;
+      dragId = tr.dataset.apt; tr.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', dragId); } catch { /* τίποτα */ }
+    });
+    document.addEventListener('dragover', (e) => {
+      if (!dragId) return;
+      const tr = e.target.closest && e.target.closest('#aptTable tbody tr[data-apt]');
+      if (!tr) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+      const r = tr.getBoundingClientRect(); const after = e.clientY > r.top + r.height / 2;
+      $$('.drop-before, .drop-after').forEach((x) => x.classList.remove('drop-before', 'drop-after'));
+      if (tr.dataset.apt !== dragId) tr.classList.add(after ? 'drop-after' : 'drop-before');
+    });
+    document.addEventListener('drop', (e) => {
+      if (!dragId) return;
+      const tr = e.target.closest && e.target.closest('#aptTable tbody tr[data-apt]');
+      if (tr && tr.dataset.apt !== dragId) {
+        e.preventDefault();
+        const b = building();
+        const list = sortApts(b.apartments).map((a) => a.id).filter((id) => id !== dragId);
+        let idx = list.indexOf(tr.dataset.apt);
+        if (tr.classList.contains('drop-after')) idx += 1;
+        reorderApt(b, dragId, idx);
+        dragId = null; clear(); rerenderBody(); scheduleSave();
+      }
+    });
+    document.addEventListener('dragend', () => { dragId = null; clear(); $$('tr[draggable="true"]').forEach((tr) => { tr.draggable = false; }); });
   }
 
   init();
