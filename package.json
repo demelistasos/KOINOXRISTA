@@ -5,7 +5,7 @@
   "description": "Υπολογισμός κοινοχρήστων πολυκατοικίας — Windows & macOS",
   "main": "main.js",
   "author": "Tasos Demelis",
-  "license": "UNLICENSED",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
   "scripts": {
     "start": "electron .",
@@ -26,7 +26,8 @@
       "preload.js",
       "updater.js",
       "src/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE.md"
     ],
     "directories": {
       "buildResources": "build",

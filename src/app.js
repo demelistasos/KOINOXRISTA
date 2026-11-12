@@ -535,6 +535,10 @@
         <label class="field"><span>Σημείωση προς τους ενοίκους</span><textarea class="inp" data-root="b" data-path="note" rows="2">${esc(b.note || '')}</textarea></label>
         <label class="check"><input type="checkbox" data-root="b" data-path="receiptOverview" ${b.receiptOverview !== false ? 'checked' : ''}>Να εμφανίζεται η «Ανάλυση ανά ένοικο» σε κάθε ειδοποιητήριο (διαμερίσματα με το ίδιο όνομα ενοίκου βγαίνουν μαζί σε ένα χαρτί)</label>
       </div></section>
+      <section class="card"><div class="card-h"><h2>Σχετικά</h2><span class="hint">${upd.current ? 'Έκδοση ' + esc(upd.current) : ''}</span></div><div class="card-b" style="color:var(--ink-2);display:grid;gap:6px">
+        <div><b style="color:var(--ink)">© 2026 Τάσος Δεμέλης.</b> Άδεια χρήσης PolyForm Noncommercial 1.0.0.</div>
+        <div>Ελεύθερη για προσωπική και μη κερδοσκοπική χρήση. <b>Απαγορεύεται κάθε εμπορική χρήση</b>, όπως η πώληση της εφαρμογής ή παραλλαγής της ή η χρήση της για διαχείριση πολυκατοικιών έναντι αμοιβής, χωρίς γραπτή άδεια του δημιουργού.</div>
+      </div></section>
       <section class="card danger-zone"><div class="card-h"><h2>Διαγραφή</h2></div><div class="card-b" style="display:flex;justify-content:space-between;align-items:center;gap:16px">
         <span style="color:var(--ink-2)">Διαγράφει την πολυκατοικία, τα διαμερίσματα και όλο το ιστορικό της.</span>
         <button class="btn danger" data-act="del-building">${I.trash}Διαγραφή πολυκατοικίας</button></div></section>
