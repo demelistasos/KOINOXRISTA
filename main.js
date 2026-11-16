@@ -18,6 +18,16 @@ const dataDir = () => app.getPath('userData');
 const dataFile = () => path.join(dataDir(), 'koinoxrista.json');
 const backupFile = () => path.join(dataDir(), 'koinoxrista.previous.json');
 
+// Πού υπάρχει εγγενής διαφάνεια παραθύρου: macOS, και Windows 11 (build 22000+).
+function glassMode() {
+  if (process.platform === 'darwin') return 'mac';
+  if (process.platform === 'win32') {
+    const build = Number(String(require('os').release()).split('.')[2] || 0);
+    return build >= 22000 ? 'win' : '';
+  }
+  return '';
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1360,
@@ -25,7 +35,10 @@ function createWindow() {
     minWidth: 1060,
     minHeight: 700,
     title: 'Κοινόχρηστα',
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#16181d' : '#f4f1ea',
+    // Εγγενής διαφάνεια: macOS vibrancy, Windows 11 acrylic. Αλλού, συμπαγές φόντο.
+    ...(glassMode() === 'mac' ? { vibrancy: 'under-window', visualEffectState: 'active', backgroundColor: '#00000000' }
+      : glassMode() === 'win' ? { backgroundMaterial: 'acrylic', backgroundColor: '#00000000' }
+      : { backgroundColor: nativeTheme.shouldUseDarkColors ? '#0b0d18' : '#eef0f7' }),
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
     trafficLightPosition: isMac ? { x: 18, y: 20 } : undefined,
     autoHideMenuBar: !isMac,
@@ -37,7 +50,7 @@ function createWindow() {
       sandbox: true
     }
   });
-  win.loadFile(path.join(__dirname, 'src', 'index.html'));
+  win.loadFile(path.join(__dirname, 'src', 'index.html'), { query: glassMode() ? { glass: '1' } : {} });
   win.once('ready-to-show', () => win.show());
   // Εξωτερικοί σύνδεσμοι ανοίγουν στον browser, όχι μέσα στην εφαρμογή.
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });

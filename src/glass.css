@@ -1,0 +1,277 @@
+/* Κοινόχρηστα — θέμα «γυαλί»: ημιδιάφανες επιφάνειες με θάμπωμα, φωτεινό φόντο
+   «aurora» από πίσω και βάθος με πολλαπλές σκιές. Φορτώνεται μετά το styles.css. */
+
+:root {
+  --bg: #eef0f7;
+  --aur-1: #ffb38f;
+  --aur-2: #b9c7ff;
+  --aur-3: #f3b6e0;
+  --aur-4: #a6ecd9;
+  --aur-op: .85;
+  --glass: rgba(255, 255, 255, .58);
+  --glass-strong: rgba(255, 255, 255, .78);
+  --glass-soft: rgba(255, 255, 255, .38);
+  --glass-line: rgba(255, 255, 255, .75);
+  --glass-edge: rgba(23, 26, 46, .08);
+  --hi: inset 0 1px 0 rgba(255, 255, 255, .9);
+  --well: rgba(255, 255, 255, .55);
+  --well-line: rgba(23, 26, 46, .10);
+  --ink: #161a2e;
+  --ink-2: #4a5070;
+  --ink-3: #7c8199;
+  --line: rgba(23, 26, 46, .08);
+  --line-strong: rgba(23, 26, 46, .14);
+  --paper: transparent;
+  --surface: var(--glass-strong);
+  --surface-2: rgba(255, 255, 255, .5);
+  --accent: #f0603a;
+  --accent-2: #d9407a;
+  --accent-grad: linear-gradient(135deg, #ff8a4c 0%, #f0603a 45%, #d9407a 100%);
+  --accent-hover: #e2522e;
+  --accent-ink: #fff;
+  --accent-soft: rgba(240, 96, 58, .14);
+  --c-heat: #f0603a;
+  --c-elev: #5b6cff;
+  --c-gen: #16b38a;
+  --ok: #129c78;
+  --warn: #b7741a;
+  --warn-soft: rgba(255, 196, 102, .22);
+  --danger: #e0435e;
+  --rail: transparent;
+  --rail-2: rgba(255, 255, 255, .55);
+  --rail-ink: var(--ink);
+  --rail-mute: var(--ink-3);
+  --focus: 0 0 0 4px rgba(240, 96, 58, .22);
+  --shadow: 0 1px 1px rgba(23, 26, 46, .04), 0 6px 16px -6px rgba(23, 26, 46, .10), 0 24px 48px -24px rgba(70, 50, 140, .22);
+  --shadow-lift: 0 2px 2px rgba(23, 26, 46, .05), 0 14px 30px -10px rgba(23, 26, 46, .16), 0 40px 80px -30px rgba(70, 50, 140, .30);
+  --serif: "Segoe UI Variable Display", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --sans: "Segoe UI Variable Text", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --r: 18px;
+  --blur: blur(22px) saturate(170%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0d18;
+    --aur-1: #ff6a3d; --aur-2: #4b5cff; --aur-3: #c03f9a; --aur-4: #10a888; --aur-op: .32;
+    --glass: rgba(26, 30, 50, .55); --glass-strong: rgba(30, 34, 56, .72); --glass-soft: rgba(26, 30, 50, .35);
+    --glass-line: rgba(255, 255, 255, .10); --glass-edge: rgba(0, 0, 0, .35);
+    --hi: inset 0 1px 0 rgba(255, 255, 255, .08);
+    --well: rgba(10, 12, 24, .45); --well-line: rgba(255, 255, 255, .10);
+    --ink: #eef0fa; --ink-2: #b4b8d0; --ink-3: #868aa6;
+    --line: rgba(255, 255, 255, .07); --line-strong: rgba(255, 255, 255, .13);
+    --surface-2: rgba(255, 255, 255, .05); --rail-2: rgba(255, 255, 255, .08);
+    --accent-soft: rgba(255, 122, 80, .18); --warn-soft: rgba(255, 196, 102, .10);
+    --c-elev: #8a96ff; --c-gen: #3fd3a9; --ok: #3fd3a9; --warn: #f2b65a; --danger: #ff7189;
+    --shadow: 0 1px 1px rgba(0, 0, 0, .3), 0 8px 20px -8px rgba(0, 0, 0, .55), 0 30px 60px -28px rgba(0, 0, 0, .8);
+    --shadow-lift: 0 2px 2px rgba(0, 0, 0, .35), 0 16px 34px -12px rgba(0, 0, 0, .65), 0 44px 90px -30px rgba(0, 0, 0, .9);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0d18;
+  --aur-1: #ff6a3d; --aur-2: #4b5cff; --aur-3: #c03f9a; --aur-4: #10a888; --aur-op: .32;
+  --glass: rgba(26, 30, 50, .55); --glass-strong: rgba(30, 34, 56, .72); --glass-soft: rgba(26, 30, 50, .35);
+  --glass-line: rgba(255, 255, 255, .10); --glass-edge: rgba(0, 0, 0, .35);
+  --hi: inset 0 1px 0 rgba(255, 255, 255, .08);
+  --well: rgba(10, 12, 24, .45); --well-line: rgba(255, 255, 255, .10);
+  --ink: #eef0fa; --ink-2: #b4b8d0; --ink-3: #868aa6;
+  --line: rgba(255, 255, 255, .07); --line-strong: rgba(255, 255, 255, .13);
+  --surface-2: rgba(255, 255, 255, .05); --rail-2: rgba(255, 255, 255, .08);
+  --accent-soft: rgba(255, 122, 80, .18); --warn-soft: rgba(255, 196, 102, .10);
+  --c-elev: #8a96ff; --c-gen: #3fd3a9; --ok: #3fd3a9; --warn: #f2b65a; --danger: #ff7189;
+  --shadow: 0 1px 1px rgba(0, 0, 0, .3), 0 8px 20px -8px rgba(0, 0, 0, .55), 0 30px 60px -28px rgba(0, 0, 0, .8);
+  --shadow-lift: 0 2px 2px rgba(0, 0, 0, .35), 0 16px 34px -12px rgba(0, 0, 0, .65), 0 44px 90px -30px rgba(0, 0, 0, .9);
+}
+
+body { background: var(--bg); font-size: 14px; letter-spacing: -.003em; }
+/* Με εγγενή διαφάνεια (Windows 11 acrylic / macOS vibrancy) αφήνουμε το παράθυρο να «φαίνεται» λίγο */
+body.native-glass { background: color-mix(in srgb, var(--bg) 62%, transparent); }
+
+/* ---------- φόντο aurora ---------- */
+.aurora { position: fixed; inset: -10%; z-index: 0; pointer-events: none; filter: blur(70px) saturate(130%); opacity: var(--aur-op); }
+.aurora i { position: absolute; border-radius: 50%; mix-blend-mode: normal; animation: drift 28s ease-in-out infinite alternate; }
+.aurora i:nth-child(1) { width: 46vw; height: 46vw; left: 8%; top: -6%; background: var(--aur-1); }
+.aurora i:nth-child(2) { width: 52vw; height: 52vw; right: -6%; top: 4%; background: var(--aur-2); animation-delay: -7s; }
+.aurora i:nth-child(3) { width: 40vw; height: 40vw; left: 30%; bottom: -14%; background: var(--aur-3); animation-delay: -14s; }
+.aurora i:nth-child(4) { width: 30vw; height: 30vw; left: -6%; bottom: 6%; background: var(--aur-4); animation-delay: -21s; }
+@keyframes drift { to { transform: translate3d(4vw, 3vh, 0) scale(1.08); } }
+.shell { position: relative; z-index: 1; background: transparent; }
+
+/* ---------- κοινό «γυαλί» ---------- */
+.card, .head, .rail, .dialog, .upd, .toast, .period, .warns, .banner {
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+}
+.card {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r);
+  box-shadow: var(--hi), var(--shadow);
+  transition: box-shadow .25s, transform .25s;
+}
+.card-h { padding: 18px 22px 0; }
+.card-h h2 { font: 650 17px/1.25 var(--serif); letter-spacing: -.01em; }
+.card-b { padding: 16px 22px 22px; }
+.card-f { border-top: 1px solid var(--line); padding: 14px 22px; }
+
+/* ---------- πλαϊνή στήλη ---------- */
+.shell { grid-template-columns: 264px 1fr; }
+.rail {
+  margin: 12px 0 12px 12px; height: calc(100vh - 24px);
+  background: var(--glass-soft); border: 1px solid var(--glass-line); border-radius: 22px;
+  box-shadow: var(--hi), var(--shadow); color: var(--ink); padding: 20px 12px 12px;
+}
+.mac .rail { padding-top: 46px; }
+.brand-mark {
+  width: 34px; height: 34px; border-radius: 11px; font: 800 17px/1 var(--serif);
+  background: var(--accent-grad); color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 6px 14px -4px rgba(240, 96, 58, .55);
+}
+.brand-name { font: 700 16px/1.1 var(--serif); letter-spacing: -.01em; }
+.brand-sub, .rail-label { color: var(--ink-3); }
+.b-item { color: var(--ink); border-radius: 12px; padding: 10px 12px; transition: background .15s, transform .15s; }
+.b-item:hover { background: rgba(255, 255, 255, .35); }
+.b-item[aria-current="true"] { background: var(--glass-strong); box-shadow: var(--hi), 0 6px 18px -8px rgba(23, 26, 46, .25); }
+.b-item[aria-current="true"]::before { content: ""; position: absolute; }
+.b-item .b-meta { color: var(--ink-3); }
+.b-item .b-dot.open { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.rail-add { border: 1px dashed var(--line-strong); color: var(--ink-2); border-radius: 12px; }
+.rail-add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.rail-link { color: var(--ink-2); border-radius: 10px; }
+.rail-link:hover { color: var(--ink); background: rgba(255, 255, 255, .3); }
+.save-state { color: var(--ink-3); }
+
+/* ---------- κεφαλίδα ---------- */
+.stage { padding: 12px 12px 0 16px; display: flex; flex-direction: column; overflow: hidden; }
+.stage > .head { position: relative; flex: none; z-index: 5; }
+.stage > .body { flex: 1; min-height: 0; overflow: auto; margin: 0 -12px 0 -16px; padding-left: 26px; padding-right: 22px; }
+.stage > .welcome { overflow: auto; }
+.head {
+  top: 0; border-radius: 22px; margin-bottom: 4px;
+  background: var(--glass-soft); border: 1px solid var(--glass-line); border-bottom: 1px solid var(--glass-line);
+  box-shadow: var(--hi), var(--shadow); padding: 20px 26px 0;
+}
+.title { font: 750 30px/1.05 var(--serif); letter-spacing: -.025em; }
+.subtitle { color: var(--ink-3); }
+.period { background: var(--glass-strong); border: 1px solid var(--glass-line); box-shadow: var(--hi), var(--shadow); }
+.period select { font: 650 15px/1 var(--serif); }
+.badge { background: var(--accent-soft); color: var(--accent); }
+.badge.closed { background: rgba(23, 26, 46, .06); color: var(--ink-3); }
+.tabs { gap: 6px; margin-top: 16px; padding-bottom: 12px; }
+.tab { padding: 8px 14px; border-radius: 999px; color: var(--ink-2); transition: background .15s, color .15s; }
+.tab:hover { background: rgba(255, 255, 255, .35); color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); background: var(--glass-strong); box-shadow: var(--hi), 0 4px 12px -6px rgba(23, 26, 46, .3); }
+.tab[aria-selected="true"]::after { display: none; }
+.body { padding: 22px 10px 60px; }
+
+/* ---------- κουμπιά με «όγκο» ---------- */
+.btn {
+  border: 1px solid var(--glass-line); background: var(--glass-strong); color: var(--ink);
+  border-radius: 12px; padding: 9px 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85), inset 0 -2px 0 rgba(23, 26, 46, .05), 0 1px 2px rgba(23, 26, 46, .08), 0 6px 14px -8px rgba(23, 26, 46, .25);
+  transition: transform .12s, box-shadow .12s, background .12s;
+}
+.btn:hover { border-color: var(--glass-line); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -2px 0 rgba(23, 26, 46, .05), 0 2px 3px rgba(23, 26, 46, .08), 0 12px 22px -10px rgba(23, 26, 46, .3); }
+.btn:active { transform: translateY(1px); box-shadow: inset 0 2px 4px rgba(23, 26, 46, .12); }
+.btn.primary {
+  background: var(--accent-grad); border-color: transparent; color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), inset 0 -2px 0 rgba(0, 0, 0, .12), 0 2px 4px rgba(217, 64, 122, .25), 0 12px 24px -10px rgba(240, 96, 58, .6);
+}
+.btn.primary:hover { background: var(--accent-grad); filter: brightness(1.05); }
+.btn.ghost { background: transparent; box-shadow: none; border-color: transparent; }
+.btn.ghost:hover { background: rgba(255, 255, 255, .35); transform: none; }
+.btn.danger { color: var(--danger); }
+.icon-btn { border-radius: 10px; }
+.icon-btn:hover { background: rgba(255, 255, 255, .45); }
+
+/* ---------- πεδία: «σκαμμένα» στο γυαλί ---------- */
+.inp {
+  background: var(--well); border: 1px solid var(--well-line); border-radius: 11px;
+  box-shadow: inset 0 1px 2px rgba(23, 26, 46, .07);
+}
+.inp:hover { border-color: var(--line-strong); }
+.inp:focus { background: var(--glass-strong); border-color: var(--accent); box-shadow: var(--focus); }
+.inp:disabled { background: transparent; border-style: dashed; box-shadow: none; }
+.field > span { color: var(--ink-2); font-weight: 600; }
+
+/* ---------- πετρέλαιο ---------- */
+.oil-strip { border: 0; gap: 10px; background: none; }
+.oil-strip > div {
+  border: 1px solid var(--glass-line); border-radius: 14px; background: var(--glass-strong);
+  box-shadow: var(--hi), 0 4px 12px -8px rgba(23, 26, 46, .25);
+}
+.oil-strip > div:last-child { background: var(--accent-grad); border-color: transparent; color: #fff; }
+.oil-strip > div:last-child small { color: rgba(255, 255, 255, .8); }
+.oil-strip > div:last-child b { color: #fff; }
+.oil-strip b { font: 700 19px/1.1 var(--serif); letter-spacing: -.01em; }
+
+/* ---------- πίνακες ---------- */
+.tbl th { color: var(--ink-3); border-bottom: 1px solid var(--line-strong); }
+.tbl td { border-bottom: 1px solid var(--line); }
+.tbl tbody tr { transition: background .12s; }
+.tbl tbody tr:hover td { background: rgba(255, 255, 255, .28); }
+.tbl tfoot td { border-top: 1px solid var(--line-strong); }
+
+/* ---------- περίληψη με 3D κλίση ---------- */
+.summary { top: 0; perspective: 1200px; }
+.big {
+  position: relative; overflow: hidden; color: #fff;
+  background: radial-gradient(120% 140% at 0% 0%, #ff9a5a 0%, #f0603a 38%, #d9407a 72%, #7c4dff 120%);
+  border: 1px solid rgba(255, 255, 255, .35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), var(--shadow-lift);
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(0);
+  transform-style: preserve-3d; transition: transform .35s cubic-bezier(.2, .8, .2, 1);
+}
+.big::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(60% 50% at var(--gx, 30%) var(--gy, 0%), rgba(255, 255, 255, .35), transparent 70%);
+}
+.big small { color: rgba(255, 255, 255, .82); }
+.big .amount { font: 750 40px/1.05 var(--serif); letter-spacing: -.03em; text-shadow: 0 6px 18px rgba(80, 10, 40, .25); }
+.big .amount span { color: rgba(255, 255, 255, .78); }
+.big .bar { background: rgba(255, 255, 255, .25); height: 12px; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .15); }
+.big .bar i:nth-child(1) { background: #fff !important; }
+.big .bar i:nth-child(2) { background: rgba(255, 255, 255, .7) !important; }
+.big .bar i:nth-child(3) { background: rgba(255, 255, 255, .45) !important; }
+.big .legend { color: rgba(255, 255, 255, .92); }
+.big .legend b { color: #fff; }
+.big .legend .sub { color: rgba(255, 255, 255, .72); }
+.big .legend em { box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+.big .legend div:nth-child(1) em { background: #fff !important; }
+.big .legend div:nth-child(2) em { background: rgba(255, 255, 255, .7) !important; }
+.big .legend div:nth-child(3) em { background: rgba(255, 255, 255, .45) !important; }
+.big .legend[style] { border-top-color: rgba(255, 255, 255, .25) !important; }
+.d-row .mini { height: 6px; background: rgba(23, 26, 46, .06); }
+.d-row .mini i:first-child { border-radius: 9px 0 0 9px; }
+.dist h3 { font: 650 15px/1.2 var(--serif); }
+.warns { background: var(--warn-soft); border: 1px solid rgba(255, 196, 102, .45); border-radius: 16px; }
+.banner { background: var(--glass); border: 1px solid var(--glass-line); border-radius: 16px; box-shadow: var(--hi), var(--shadow); }
+
+/* ---------- εισπράξεις ---------- */
+.collect { border-color: var(--glass-line); box-shadow: var(--hi), var(--shadow), 0 0 0 1px var(--accent-soft); }
+.paid { background: var(--glass-strong); border-color: var(--line-strong); }
+.paid:has(input:checked) { background: rgba(18, 156, 120, .14); }
+
+/* ---------- καλωσόρισμα ---------- */
+.welcome { max-width: 680px; padding: 46px 48px; margin-top: 10vh; border-radius: 28px;
+  background: var(--glass); border: 1px solid var(--glass-line); box-shadow: var(--hi), var(--shadow-lift);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+.welcome h1 { font: 800 46px/1.03 var(--serif); letter-spacing: -.035em; color: var(--ink); }
+
+/* ---------- διάλογοι, ειδοποιήσεις ---------- */
+.modal-root { background: rgba(12, 14, 28, .28); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.dialog { background: var(--glass-strong); border: 1px solid var(--glass-line); border-radius: 24px; box-shadow: var(--hi), var(--shadow-lift); }
+.dialog h2 { font: 700 21px/1.2 var(--serif); letter-spacing: -.015em; }
+.dialog iframe { background: rgba(0, 0, 0, .04); }
+.toast { background: rgba(22, 26, 46, .82); color: #fff; border: 1px solid rgba(255, 255, 255, .15); border-radius: 14px; }
+.upd { background: var(--glass-strong); border: 1px solid var(--glass-line); border-radius: 18px; box-shadow: var(--hi), var(--shadow-lift); }
+.upd-bar i { background: var(--accent-grad); }
+
+/* ---------- μικρά ---------- */
+.chip { background: var(--glass-strong); border-color: var(--line-strong); }
+.chip[aria-pressed="true"] { background: var(--accent-grad); color: #fff; border-color: transparent; box-shadow: 0 6px 14px -8px rgba(240, 96, 58, .7); }
+.switch input:checked + i { background: var(--accent-grad); }
+.folder code { background: var(--well); border-color: var(--well-line); }
+.hist-row .m { font: 650 16px var(--serif); }
+
+@media (max-width: 1240px) { .summary { perspective: none; } }
+@media (prefers-reduced-motion: reduce) { .aurora i { animation: none; } .big { transform: none !important; } }

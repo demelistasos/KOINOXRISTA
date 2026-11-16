@@ -434,7 +434,7 @@
     const maxT = Math.max(1, ...comp.results.map((r) => r.charges));
     const [whole, dec] = C.money(t.charges).split(',');
     return `
-      <section class="card big">
+      <section class="card big tilt">
         <small>Έξοδα ${esc(C.periodLabel(p))}</small>
         <div class="amount">${whole}<span>,${dec} €</span></div>
         <div class="bar">${parts.map(([, v, c]) => `<i style="width:${(v / sum) * 100}%;background:${c}"></i>`).join('')}</div>
@@ -710,8 +710,8 @@
 
   function rerenderBody() {
     const b = building(); const p = period(b);
-    const st = $('#stage'); const y = st.scrollTop;
-    $('#body').innerHTML = tabBody(b, p);
+    const st = $('#body'); const y = st.scrollTop;
+    st.innerHTML = tabBody(b, p);
     refresh(); st.scrollTop = y;
   }
   function focusLast(sel) { const els = $$(sel); const el = els[els.length - 1]; if (el) el.focus(); }
@@ -876,6 +876,7 @@
   // ---------- εκκίνηση ----------
   async function init() {
     if (api && api.platform === 'darwin') document.body.classList.add('mac');
+    try { if (new URLSearchParams(location.search).get('glass') === '1') document.body.classList.add('native-glass'); } catch { /* τίποτα */ }
     data = normalize(await store.load());
     if (api && api.pdfDefaultDir) pdfDefault = await api.pdfDefaultDir();
     if (api && api.backupDefaultDir) backupDefault = await api.backupDefaultDir();
@@ -927,6 +928,7 @@
       else if (j && j.failed) toast('Η τελευταία ενημέρωση δεν ολοκληρώθηκε· έμεινε η προηγούμενη έκδοση.');
     }
     setupDrag();
+    setupTilt();
     if ((data.prefs.lastBackup || '').slice(0, 10) !== new Date().toISOString().slice(0, 10)) autoBackup('ημερήσιο');
     window.addEventListener('beforeunload', () => { if (saveTimer) saveNow(); });
   }
@@ -967,6 +969,22 @@
       }
     });
     document.addEventListener('dragend', () => { dragId = null; clear(); $$('tr[draggable="true"]').forEach((tr) => { tr.draggable = false; }); });
+  }
+
+  // ---------- 3D κλίση της κάρτας συνόλου ----------
+  function setupTilt() {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.addEventListener('mousemove', (e) => {
+      const el = e.target.closest && e.target.closest('.tilt');
+      $$('.tilt').forEach((t) => { if (t !== el) { t.style.removeProperty('--rx'); t.style.removeProperty('--ry'); } });
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+      el.style.setProperty('--ry', ((x - 0.5) * 10).toFixed(2) + 'deg');
+      el.style.setProperty('--rx', ((0.5 - y) * 8).toFixed(2) + 'deg');
+      el.style.setProperty('--gx', (x * 100).toFixed(0) + '%');
+      el.style.setProperty('--gy', (y * 100).toFixed(0) + '%');
+    });
   }
 
   init();
