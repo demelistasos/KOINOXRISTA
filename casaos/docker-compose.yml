@@ -1,0 +1,47 @@
+# Κοινόχρηστα για CasaOS: App Store → «+» → Install a customized app → Import → επικόλληση αυτού του αρχείου.
+name: koinoxrista
+services:
+  koinoxrista:
+    image: ghcr.io/demelistasos/koinoxrista:latest
+    container_name: koinoxrista
+    restart: unless-stopped
+    ports:
+      - target: 8080
+        published: "8023"
+        protocol: tcp
+    environment:
+      TZ: Europe/Athens
+    volumes:
+      # Όλα τα δεδομένα, τα PDF και τα αντίγραφα
+      - type: bind
+        source: /DATA/AppData/koinoxrista
+        target: /data
+      # USB: όποιο USB stick συνδεθεί στον server παίρνει αυτόματα αντίγραφο
+      - type: bind
+        source: /media
+        target: /media
+        bind:
+          propagation: rslave
+    x-casaos:
+      envs:
+        - container: TZ
+          description:
+            en_us: Time zone
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: koinoxrista
+  author: Tasos Demelis
+  developer: Tasos Demelis
+  category: Utilities
+  icon: https://raw.githubusercontent.com/demelistasos/KOINOXRISTA/main/src/icon-512.png
+  title:
+    en_us: Κοινόχρηστα
+  tagline:
+    en_us: Κοινόχρηστα πολυκατοικίας
+  description:
+    en_us: Υπολογισμός κοινοχρήστων πολυκατοικίας από κάθε συσκευή.
+  port_map: "8023"
+  scheme: http
+  index: /

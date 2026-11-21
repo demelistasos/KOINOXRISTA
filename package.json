@@ -12,7 +12,8 @@
     "test": "node --test test/calc.test.js",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "server": "node server/boot.js"
   },
   "devDependencies": {
     "electron": "^37.2.0",

@@ -1,0 +1,104 @@
+/* Κοινόχρηστα — προσαρμογή για tablet και κινητό. Φορτώνεται μετά το glass.css. */
+
+.menu-btn, .rail-scrim, .tabbar { display: none; }
+.head-title { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+
+/* μηνύματα της έκδοσης server */
+.conflict { position: fixed; left: 50%; top: max(16px, env(safe-area-inset-top)); transform: translateX(-50%); z-index: 90; display: grid; gap: 2px; text-align: center;
+  background: var(--glass-strong, #fff); border: 1px solid var(--glass-line, rgba(0,0,0,.1)); border-radius: 14px; padding: 12px 18px; box-shadow: 0 18px 50px -12px rgba(0,0,0,.35); }
+.conflict span { color: var(--ink-3); font-size: 13px; }
+.note-line { font-size: 13px; color: var(--ink-2); padding: 8px 12px; border-radius: 10px; background: rgba(255, 255, 255, .25); border: 1px solid var(--line); overflow-wrap: anywhere; }
+.note-line.ok { border-color: color-mix(in srgb, #2f9e44 45%, transparent); }
+.note-line.warn { border-color: color-mix(in srgb, #e8590c 55%, transparent); }
+.bk-list { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; font-size: 12.5px; }
+.bk-list a { color: var(--accent); overflow-wrap: anywhere; }
+.users { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.users li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, .22); border: 1px solid var(--line); }
+.row-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
+
+/* ---------- tablet: η λίστα πολυκατοικιών γίνεται συρτάρι ---------- */
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); height: 100vh; height: 100dvh; }
+  .rail {
+    position: fixed; z-index: 60; top: 0; bottom: 0; left: 0; width: min(300px, 84vw); height: auto;
+    margin: max(10px, env(safe-area-inset-top)) 0 max(10px, env(safe-area-inset-bottom)) 10px;
+    background: var(--glass-strong); -webkit-backdrop-filter: blur(28px) saturate(1.5); backdrop-filter: blur(28px) saturate(1.5);
+    transform: translateX(calc(-100% - 20px)); transition: transform .26s cubic-bezier(.2, .8, .2, 1); visibility: hidden;
+  }
+  .rail-open .rail { transform: none; visibility: visible; }
+  .rail-scrim { position: fixed; inset: 0; z-index: 55; background: rgba(12, 14, 24, .32); opacity: 0; pointer-events: none; transition: opacity .2s; display: block; }
+  .rail-open .rail-scrim { opacity: 1; pointer-events: auto; }
+  .menu-btn { display: inline-grid; flex: none; margin-top: 2px; }
+  .welcome-menu { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 14px; }
+  .welcome { position: relative; padding-top: 64px; }
+  .stage { padding: max(10px, env(safe-area-inset-top)) 10px 0; height: 100vh; height: 100dvh; }
+  .stage > .body { margin: 0 -10px; padding-left: 14px; padding-right: 14px; }
+  .grid-main { grid-template-columns: minmax(0, 1fr); }
+  .summary { position: static; }
+}
+
+/* ---------- κινητό ---------- */
+@media (max-width: 640px) {
+  body { -webkit-text-size-adjust: 100%; }
+  /* χωρίς αυτόματο zoom του iPhone όταν πατάς σε πεδίο */
+  input, select, textarea, .inp { font-size: 16px !important; }
+  .head { padding: 12px 14px 0; border-radius: 18px; }
+  .head-row { gap: 10px; align-items: stretch; }
+  .head-title { width: 100%; }
+  .title { font-size: 22px; }
+  .subtitle { font-size: 12.5px; }
+  .head .actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .head .actions .period { grid-column: 1 / -1; justify-content: space-between; }
+  .head .actions .period select { flex: 1; min-width: 0; text-align: center; }
+  .head .actions .btn { justify-content: center; padding-left: 8px; padding-right: 8px; }
+  .head .actions .btn.primary { grid-column: 1 / -1; }
+
+  /* όλη η σελίδα κυλάει, ώστε η κεφαλίδα να φεύγει προς τα πάνω */
+  .stage { display: block; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+  .stage > .body { overflow: visible; margin: 0; padding: 14px 4px calc(100px + env(safe-area-inset-bottom)); }
+  .head .tabs { display: none; }
+
+  /* καρτέλες κάτω, όπως στις εφαρμογές του κινητού */
+  .tabbar {
+    position: fixed; z-index: 40; left: 10px; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); margin: 0; padding: 6px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; border-radius: 20px;
+    background: var(--glass-strong); border: 1px solid var(--glass-line); box-shadow: var(--hi), 0 16px 40px -12px rgba(15, 18, 36, .35);
+    -webkit-backdrop-filter: blur(26px) saturate(1.6); backdrop-filter: blur(26px) saturate(1.6);
+  }
+  .tabbar .tab { padding: 12px 2px; font-size: 13px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 14px; }
+  .head { padding-bottom: 14px; }
+
+  .row2, .row-form { grid-template-columns: minmax(0, 1fr); }
+  .card-h { flex-wrap: wrap; gap: 6px; }
+  .card-b { padding-left: 14px; padding-right: 14px; }
+  .folder { flex-wrap: wrap; }
+  .folder code { flex-basis: 100%; overflow-wrap: anywhere; }
+  .danger-zone .card-b { flex-direction: column; align-items: stretch !important; }
+
+  /* πίνακες: κύλιση στο πλάι με σταθερή την πρώτη στήλη */
+  .tbl-wrap { -webkit-overflow-scrolling: touch; margin: 0 -14px; padding: 0 14px; }
+  .tbl td:first-child, .tbl th:first-child { position: sticky; left: 0; z-index: 1; background: var(--glass-strong); }
+  .tbl .owner { max-width: 120px; }
+  .tbl .inp { min-width: 72px; }
+
+  /* παράθυρα σε όλη την οθόνη */
+  .modal-root { place-items: end center; }
+  .dialog { width: 100vw; max-height: 92dvh; overflow: auto; border-radius: 22px 22px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+  .dialog.wide { width: 100vw; height: 94dvh; border-radius: 22px 22px 0 0; }
+  .dialog .d-h { flex-wrap: wrap; padding: 16px 16px 8px; }
+  .dialog .d-h .actions { width: 100%; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .dialog .d-h .actions .btn { justify-content: center; }
+  .dialog .d-h .actions .btn.primary { grid-column: 1 / -1; order: -1; }
+  .print-btn { display: none !important; }
+
+  .toast { bottom: calc(92px + env(safe-area-inset-bottom)) !important; max-width: calc(100vw - 32px); }
+  .upd { left: 10px !important; right: 10px !important; bottom: calc(90px + env(safe-area-inset-bottom)) !important; width: auto !important; }
+}
+
+/* συσκευές αφής: μεγαλύτεροι στόχοι, χωρίς «κολλημένο» hover */
+@media (hover: none) {
+  .btn, .icon-btn, .tab, .b-item, .rail-link { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  .icon-btn { min-width: 40px; min-height: 40px; }
+  .grip { display: none; }
+  .big { transform: none !important; }
+}

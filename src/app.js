@@ -39,13 +39,15 @@
   function scheduleSave() {
     clearTimeout(saveTimer);
     setSaveState('Αποθήκευση…');
+    window.kxDirty = true;
     saveTimer = setTimeout(saveNow, 350);
   }
   async function saveNow() {
-    clearTimeout(saveTimer);
+    clearTimeout(saveTimer); saveTimer = null;
     data.ui = { bId: ui.bId, tab: ui.tab };
     try {
       await store.save(data);
+      window.kxDirty = false;
       lastSaved = new Date();
       setSaveState('Αποθηκεύτηκε ' + lastSaved.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' }));
     } catch (err) {
@@ -53,6 +55,12 @@
       toast('Δεν αποθηκεύτηκαν οι αλλαγές: ' + err.message);
     }
   }
+  // Στην έκδοση server, η καρτέλα και η πολυκατοικία που βλέπεις μένουν σε κάθε συσκευή χωριστά.
+  function saveUi() {
+    if (api && api.web) { try { localStorage.setItem('kx-ui', JSON.stringify({ bId: ui.bId, tab: ui.tab })); } catch { /* τίποτα */ } }
+    else scheduleSave();
+  }
+  function localUi() { if (!api || !api.web) return null; try { return JSON.parse(localStorage.getItem('kx-ui') || 'null'); } catch { return null; } }
   function setSaveState(t) { const el = $('#saveState'); if (el) el.textContent = t; }
 
   function normalize(d) {
@@ -220,6 +228,7 @@
   }
   async function updateNow() {
     if (!api || !upd.canAuto) return;
+    if (api.web) { await saveNow(); api.installUpdate(); return; }
     const ok = await confirmBox({ title: `Ενημέρωση στην έκδοση ${upd.version}`, message: 'Η εφαρμογή θα κατεβάσει τη νέα έκδοση, θα <b>κλείσει</b> και θα <b>ξανανοίξει μόνη της</b>.<ul style="margin:8px 0 0;padding-left:18px"><li>Τα στοιχεία σου δεν αλλάζουν· πριν από την ενημέρωση κρατιέται και αντίγραφο.</li><li>Αν κάτι δεν πάει καλά, μένει η τωρινή έκδοση.</li></ul>', ok: 'Ενημέρωση τώρα' });
     if (!ok) return;
     await saveNow();
@@ -245,6 +254,7 @@
         <button class="rail-link" data-act="backup">${I.down}Αντίγραφο ασφαλείας</button>
         <button class="rail-link" data-act="restore">${I.up}Επαναφορά αντιγράφου</button>
         <button class="rail-link" data-act="theme">${I.moon}${themeLabel}</button>
+        ${api && api.web ? `<button class="rail-link" data-act="logout">${I.x}Αποσύνδεση</button>` : ''}
         <button class="rail-link" data-act="update-check">${I.refresh}<span id="updLine">${esc(updLine())}</span></button>
         <div class="save-state" id="saveState">${lastSaved ? 'Αποθηκεύτηκε ' + lastSaved.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' }) : 'Αποθηκεύεται αυτόματα'}</div>
       </div>`;
@@ -260,12 +270,15 @@
     ui.pId = p ? p.id : null;
     ensureRows(b, p);
     syncBalances(b);
-    st.innerHTML = head(b, p) + `<div class="body" id="body">${tabBody(b, p)}</div>`;
+    const y = st.scrollTop;
+    st.innerHTML = head(b, p) + `<div class="body" id="body">${tabBody(b, p)}</div>` + tabbar();
+    st.scrollTop = y;
     refresh();
   }
 
   function welcome() {
     return `<div class="welcome">
+      <button class="icon-btn menu-btn welcome-menu" data-act="menu" aria-label="Μενού"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <h1>Τα κοινόχρηστα,<br>χωρίς λογιστικά φύλλα.</h1>
       <p>Πέρασε τα έξοδα του μήνα, τις ενδείξεις των θερμιδομετρητών και το πετρέλαιο. Η εφαρμογή μοιράζει κάθε ευρώ στο λεπτό και βγάζει έτοιμα ειδοποιητήρια σε PDF.</p>
       <div class="actions"><button class="btn primary" data-act="new-building">${I.plus}Νέα πολυκατοικία</button><button class="btn" data-act="demo">${I.spark}Δοκιμή με παράδειγμα</button></div>
@@ -280,9 +293,12 @@
     const tabs = [['month', 'Μήνας'], ['apartments', 'Διαμερίσματα'], ['history', 'Ιστορικό'], ['settings', 'Ρυθμίσεις']];
     return `<header class="head">
       <div class="head-row">
-        <div>
+        <div class="head-title">
+          <button class="icon-btn menu-btn" data-act="menu" aria-label="Πολυκατοικίες και μενού"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+          <div>
           <h1 class="title" id="bTitle">${esc(b.name)}</h1>
           <div class="subtitle">${b.address ? esc(b.address) + ' · ' : ''}${b.apartments.length} διαμερίσματα ${p ? `· <span class="badge ${p.status === 'closed' ? 'closed' : ''}">${p.status === 'closed' ? 'Κλειστός μήνας' : 'Ανοιχτός μήνας'}</span>` : ''}</div>
+          </div>
         </div>
         ${p ? `<div class="actions">
           <div class="period">
@@ -300,6 +316,9 @@
     </header>`;
   }
 
+  const TABS = [['month', 'Μήνας'], ['apartments', 'Διαμερίσματα'], ['history', 'Ιστορικό'], ['settings', 'Ρυθμίσεις']];
+  // Στο κινητό οι καρτέλες κάθονται στο κάτω μέρος της οθόνης.
+  const tabbar = () => `<nav class="tabbar" aria-label="Καρτέλες">${TABS.map(([k, l]) => `<button class="tab" data-act="tab" data-tab="${k}" aria-selected="${ui.tab === k}">${k === 'apartments' ? 'Διαμ/τα' : l}</button>`).join('')}</nav>`;
   function tabBody(b, p) {
     if (ui.tab === 'apartments') return apartmentsTab(b, p);
     if (ui.tab === 'history') return historyTab(b);
@@ -518,7 +537,7 @@
       <section class="card"><div class="card-h"><h2>Συντελεστές ανελκυστήρα</h2><button class="btn ghost sm" data-act="reset-factors">Επαναφορά προεπιλογών</button></div>
         <div class="card-b"><p style="margin:0 0 14px;color:var(--ink-2)">Τα χιλιοστά ασανσέρ = χιλιοστά × συντελεστής ορόφου, αναγμένα στα 1000. Άφησε κενό για την προεπιλογή (ισόγειο 0, 1ος 1,00 και +0,10 ανά όροφο).</p><div class="factors">${factors}</div></div></section>
       <section class="card"><div class="card-h"><h2>Επαναλαμβανόμενα έξοδα</h2></div><div class="card-b"><p style="margin:0 0 12px;color:var(--ink-2)">Όσα επιλέξεις μεταφέρονται με το ίδιο ποσό στον επόμενο μήνα κατά το κλείσιμο.</p><div class="chips">${chips}</div></div></section>
-      <section class="card"><div class="card-h"><h2>Αντίγραφα ασφαλείας</h2><span class="hint">Κοινά για όλες τις πολυκατοικίες</span></div><div class="card-b" style="display:grid;gap:12px">
+      ${api && api.web ? webCards() : `      <section class="card"><div class="card-h"><h2>Αντίγραφα ασφαλείας</h2><span class="hint">Κοινά για όλες τις πολυκατοικίες</span></div><div class="card-b" style="display:grid;gap:12px">
         ${api && api.autoBackup ? `<div class="folder"><code>${esc(data.prefs.backupDir || backupDefault)}</code>
           <button class="btn sm" data-act="bk-folder">Αλλαγή…</button><button class="btn sm" data-act="bk-folder-open">Άνοιγμα</button>${data.prefs.backupDir ? '<button class="btn sm ghost" data-act="bk-folder-reset">Προεπιλογή</button>' : ''}</div>
           <p style="margin:0;color:var(--ink-2)">Αντίγραφο γίνεται αυτόματα <b>σε κάθε κλείσιμο μήνα</b>, <b>μία φορά τη μέρα</b> και <b>πριν από κάθε επαναφορά</b>. Κρατιούνται τα 60 πιο πρόσφατα. Για να είναι ασφαλή αν χαλάσει ο υπολογιστής, διάλεξε φάκελο σε USB, OneDrive, iCloud ή Dropbox.</p>
@@ -531,6 +550,7 @@
           <p style="margin:0;color:var(--ink-2)">Τα PDF αποθηκεύονται αυτόματα με αυτή τη σειρά: φάκελος › πολυκατοικία › μήνας, π.χ. <b>${esc(b.name)} › 2026-11 Νοέμβριος</b>. Αν ξαναβγάλεις PDF για τον ίδιο μήνα, αντικαθίσταται το παλιό αρχείο.</p>`
         : '<p style="margin:0;color:var(--ink-2)">Διαθέσιμο στην εφαρμογή για υπολογιστή.</p>'}
       </div></section>
+`}
       <section class="card"><div class="card-h"><h2>Ειδοποιητήρια</h2></div><div class="card-b" style="display:grid;gap:14px">
         <label class="field"><span>Σημείωση προς τους ενοίκους</span><textarea class="inp" data-root="b" data-path="note" rows="2">${esc(b.note || '')}</textarea></label>
         <label class="check"><input type="checkbox" data-root="b" data-path="receiptOverview" ${b.receiptOverview !== false ? 'checked' : ''}>Να εμφανίζεται η «Ανάλυση ανά ένοικο» σε κάθε ειδοποιητήριο (διαμερίσματα με το ίδιο όνομα ενοίκου βγαίνουν μαζί σε ένα χαρτί)</label>
@@ -543,6 +563,68 @@
         <span style="color:var(--ink-2)">Διαγράφει την πολυκατοικία, τα διαμερίσματα και όλο το ιστορικό της.</span>
         <button class="btn danger" data-act="del-building">${I.trash}Διαγραφή πολυκατοικίας</button></div></section>
     </div>`;
+  }
+
+  // ---------- κάρτες για την έκδοση server ----------
+  const web = { bk: null, users: null };
+  function webCards() {
+    setTimeout(loadWeb, 0);
+    return `<section class="card"><div class="card-h"><h2>Αντίγραφα ασφαλείας</h2><span class="hint">Στον server</span></div><div class="card-b" style="display:grid;gap:12px" id="webBk">${webBkHtml()}</div></section>
+      <section class="card"><div class="card-h"><h2>PDF</h2><span class="hint">Στον server</span></div><div class="card-b" style="display:grid;gap:12px">
+        <p style="margin:0;color:var(--ink-2)">Κάθε PDF που βγάζεις κρατιέται στον server με τη σειρά πολυκατοικία › μήνας και το βλέπουν όλες οι συσκευές. Αν ξαναβγάλεις PDF για τον ίδιο μήνα, αντικαθίσταται το παλιό.</p>
+        <div><button class="btn sm" data-act="pdf-folder-open">${I.table}Αρχείο PDF</button></div></div></section>
+      <section class="card"><div class="card-h"><h2>Χρήστες</h2><span class="hint">Όσοι μπαίνουν στην εφαρμογή</span></div><div class="card-b" style="display:grid;gap:14px" id="webUsers">${webUsersHtml()}</div></section>`;
+  }
+  const when = (iso) => (iso ? new Date(iso).toLocaleString('el-GR', { dateStyle: 'medium', timeStyle: 'short' }) : '');
+  function webBkHtml() {
+    const b = web.bk;
+    if (!b) return '<p style="margin:0;color:var(--ink-3)">Φόρτωση…</p>';
+    const st = b.status || {};
+    const copies = (st.copies || []);
+    const usb = !b.targets.length
+      ? '<div class="note-line warn">Δεν βρέθηκε USB στον server. Βάλε ένα USB stick για να γίνεται και δεύτερο αντίγραφο αυτόματα.</div>'
+      : copies.length ? copies.map((c) => `<div class="note-line ${c.ok ? 'ok' : 'warn'}">${c.ok ? 'Αντίγραφο και σε USB' : 'Δεν γράφτηκε στο USB'}: <code>${esc(c.dir)}</code>${c.ok ? '' : ' (' + esc(c.error) + ')'}</div>`).join('')
+        : `<div class="note-line">USB: <code>${esc(b.targets.join(', '))}</code> · θα γραφτεί στο επόμενο αντίγραφο</div>`;
+    return `<p style="margin:0;color:var(--ink-2)">Αντίγραφο γίνεται αυτόματα <b>κάθε μέρα</b>, <b>σε κάθε κλείσιμο μήνα</b> και <b>πριν από κάθε επαναφορά</b>. Κρατιούνται τα 90 πιο πρόσφατα στον server.</p>
+      ${usb}
+      <div class="folder" style="justify-content:space-between"><span style="color:var(--ink-3);font-size:12.5px">${st.last ? 'Τελευταίο αντίγραφο: ' + when(st.last) : 'Δεν έχει γίνει ακόμα αντίγραφο'}</span>
+        <span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="bk-now">${I.refresh}Αντίγραφο τώρα</button><button class="btn sm" data-act="backup">${I.down}Λήψη στη συσκευή</button></span></div>
+      ${b.files.length ? `<details><summary style="cursor:pointer;color:var(--ink-2)">Πρόσφατα αντίγραφα (${b.files.length})</summary><ul class="bk-list">${b.files.slice(0, 12).map((f) => `<li><a href="${api.backupUrl(f)}" download>${esc(f)}</a></li>`).join('')}</ul></details>` : ''}`;
+  }
+  function webUsersHtml() {
+    const u = web.users;
+    if (!u) return '<p style="margin:0;color:var(--ink-3)">Φόρτωση…</p>';
+    return `<ul class="users">${u.users.map((x) => `<li><span><b>${esc(x.name)}</b>${x.name === u.me ? ' <span class="badge">εσύ</span>' : ''}</span>${x.name === u.me ? '' : `<button class="btn sm ghost" data-act="user-del" data-name="${esc(x.name)}">${I.trash}Αφαίρεση</button>`}</li>`).join('')}</ul>
+      <form class="row-form" id="userAdd"><input class="inp" name="name" placeholder="Όνομα νέου μέλους" autocomplete="off" required><input class="inp" name="password" type="password" placeholder="Κωδικός (6+ χαρακτήρες)" autocomplete="new-password" minlength="6" required><button class="btn sm primary" type="submit">${I.plus}Προσθήκη</button></form>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="pw-change">Αλλαγή του κωδικού μου</button><button class="btn sm ghost" data-act="logout">Αποσύνδεση</button></div>`;
+  }
+  async function loadWeb() {
+    if (!api || !api.web) return;
+    try { web.bk = await api.backupStatus(); const el = $('#webBk'); if (el) el.innerHTML = webBkHtml(); } catch { /* τίποτα */ }
+    try { web.users = await api.users(); const el = $('#webUsers'); if (el) { el.innerHTML = webUsersHtml(); bindUserForm(); } } catch { /* τίποτα */ }
+  }
+  function bindUserForm() {
+    const f = $('#userAdd'); if (!f) return;
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(f);
+      try { await api.addUser(String(fd.get('name')).trim(), String(fd.get('password'))); toast('Προστέθηκε ο χρήστης ' + String(fd.get('name')).trim()); loadWeb(); }
+      catch (err) { toast(err.message); }
+    };
+  }
+  function passwordDialog() {
+    modal(`<form id="pwForm"><div class="d-h"><h2>Αλλαγή κωδικού</h2></div><div class="d-b">
+        <label class="field"><span>Τωρινός κωδικός</span><input class="inp" type="password" name="current" autocomplete="current-password" required></label>
+        <label class="field"><span>Νέος κωδικός</span><input class="inp" type="password" name="password" autocomplete="new-password" minlength="6" required></label>
+      </div><div class="d-f"><button type="button" class="btn ghost" data-close>Άκυρο</button><button class="btn primary" type="submit">Αλλαγή</button></div></form>`, {
+      onMount: (root, close) => {
+        $('#pwForm', root).onsubmit = async (e) => {
+          e.preventDefault(); const fd = new FormData(e.target);
+          try { await api.changePassword(String(fd.get('current')), String(fd.get('password'))); close(); toast('Ο κωδικός άλλαξε'); }
+          catch (err) { toast(err.message); }
+        };
+      }
+    });
   }
 
   // ---------- υπολογισμένα πεδία ----------
@@ -623,10 +705,10 @@
     const b = building();
     const p = b ? period(b) : null;
     switch (a) {
-      case 'pick-building': ui.bId = btn.dataset.id; ui.pId = null; render(); scheduleSave(); break;
+      case 'pick-building': ui.bId = btn.dataset.id; ui.pId = null; document.body.classList.remove('rail-open'); render(); saveUi(); break;
       case 'new-building': newBuildingDialog(); break;
       case 'demo': loadDemo(); break;
-      case 'tab': ui.tab = btn.dataset.tab; render(); scheduleSave(); break;
+      case 'tab': ui.tab = btn.dataset.tab; render(); saveUi(); $('#body') && ($('#body').scrollTop = 0); $('#stage').scrollTop = 0; break;
       case 'period-step': { const i = b.periods.indexOf(p) + Number(btn.dataset.dir); if (b.periods[i]) { ui.pId = b.periods[i].id; render(); } break; }
       case 'open-period': ui.pId = btn.dataset.id; ui.tab = 'month'; render(); break;
       case 'pin': {
@@ -689,6 +771,15 @@
       case 'bk-folder-reset': delete data.prefs.backupDir; rerenderBody(); scheduleSave(); break;
       case 'bk-folder-open': api.openBackupDir(data.prefs.backupDir || backupDefault); break;
       case 'bk-now': { const f = await autoBackup('χειροκίνητο'); if (f) { toast('Έγινε αντίγραφο ασφαλείας'); rerenderBody(); } break; }
+      case 'user-del': {
+        const name = btn.dataset.name;
+        if (!(await confirmBox({ title: 'Αφαίρεση χρήστη', message: `Ο/Η <b>${esc(name)}</b> δεν θα μπορεί πια να μπαίνει στην εφαρμογή. Τα δεδομένα δεν αλλάζουν.`, ok: 'Αφαίρεση', danger: true }))) return;
+        try { await api.delUser(name); toast('Αφαιρέθηκε'); loadWeb(); } catch (err) { toast(err.message); }
+        break;
+      }
+      case 'pw-change': passwordDialog(); break;
+      case 'logout': await saveNow(); api.logout(); break;
+      case 'menu': document.body.classList.toggle('rail-open'); break;
       case 'close-month': closeMonth(b, p); break;
       case 'reopen': reopen(b, p); break;
       case 'pdf-statement': case 'pdf-receipts': {
@@ -711,8 +802,9 @@
   function rerenderBody() {
     const b = building(); const p = period(b);
     const st = $('#body'); const y = st.scrollTop;
+    const sg = $('#stage'); const ys = sg.scrollTop;
     st.innerHTML = tabBody(b, p);
-    refresh(); st.scrollTop = y;
+    refresh(); st.scrollTop = y; sg.scrollTop = ys;
   }
   function focusLast(sel) { const els = $$(sel); const el = els[els.length - 1]; if (el) el.focus(); }
 
@@ -769,11 +861,18 @@
     const fileName = safeName(`${annual ? 'Ετήσια κατάσταση' : kind === 'statement' ? 'Πίνακας' : 'Ειδοποιητήρια'} ${label}`) + '.pdf';
     const subdir = annual ? `${year} Ετήσια κατάσταση` : `${p.year}-${String(p.month + 1).padStart(2, '0')} ${C.MONTHS[p.month]}`;
     modal(`<div class="d-h"><div><h2>${title}</h2><div style="color:var(--ink-3);font-size:13px">${esc(b.name)} · ${esc(label)}</div></div>
-      <div class="actions"><button class="btn ghost" data-close>Κλείσιμο</button><button class="btn ${api ? 'ghost' : 'primary'}" id="printBtn">Εκτύπωση</button>${api ? `<button class="btn" id="saveAsBtn">Αποθήκευση ως…</button><button class="btn primary" id="pdfBtn">${I.down}Αποθήκευση PDF</button>` : ''}</div></div>
+      <div class="actions"><button class="btn ghost" data-close>Κλείσιμο</button><button class="btn ${api ? 'ghost' : 'primary'} print-btn" id="printBtn">Εκτύπωση</button>${api ? `<button class="btn" id="saveAsBtn">${api.web ? 'Λήψη' : 'Αποθήκευση ως…'}</button><button class="btn primary" id="pdfBtn">${I.down}${api.web ? 'PDF' : 'Αποθήκευση PDF'}</button>` : ''}</div></div>
       <iframe id="pv" title="Προεπισκόπηση"></iframe>`, {
       wide: true,
       onMount: (root) => {
         const fr = $('#pv', root); fr.srcdoc = html;
+        // Στο κινητό η σελίδα A4 μικραίνει ώστε να χωράει στο πλάτος της οθόνης.
+        fr.onload = () => {
+          try {
+            const w = kind === 'statement' ? 1123 : 794;
+            if (fr.clientWidth < w) fr.contentDocument.documentElement.style.zoom = String(Math.max(0.3, (fr.clientWidth - 8) / w));
+          } catch { /* τίποτα */ }
+        };
         const doPrint = () => fr.contentWindow.print();
         $('#printBtn', root).onclick = doPrint;
         const save = async (btn, saveAs) => {
@@ -784,7 +883,7 @@
               dir: data.prefs.pdfDir || pdfDefault, building: b.name,
               subdir
             });
-            if (out) toast('Αποθηκεύτηκε: ' + out.split(/[\\/]/).slice(-3).join(' › '));
+            if (out) toast('Αποθηκεύτηκε: ' + (api.web ? out.split(' › ').slice(-3).join(' › ') : out.split(/[\\/]/).slice(-3).join(' › ')));
           } catch (err) { toast('Σφάλμα PDF: ' + err.message); }
           finally { btn.disabled = false; }
         };
@@ -881,7 +980,7 @@
     if (api && api.pdfDefaultDir) pdfDefault = await api.pdfDefaultDir();
     if (api && api.backupDefaultDir) backupDefault = await api.backupDefaultDir();
     applyTheme();
-    const saved = data.ui || {};
+    const saved = localUi() || data.ui || {};
     ui.bId = data.buildings.some((b) => b.id === saved.bId) ? saved.bId : (data.buildings[0] ? data.buildings[0].id : null);
     ui.tab = saved.tab || 'month';
     render();
@@ -929,7 +1028,7 @@
     }
     setupDrag();
     setupTilt();
-    if ((data.prefs.lastBackup || '').slice(0, 10) !== new Date().toISOString().slice(0, 10)) autoBackup('ημερήσιο');
+    if (!api || !api.web) { if ((data.prefs.lastBackup || '').slice(0, 10) !== new Date().toISOString().slice(0, 10)) autoBackup('ημερήσιο'); }
     window.addEventListener('beforeunload', () => { if (saveTimer) saveNow(); });
   }
 

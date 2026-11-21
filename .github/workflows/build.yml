@@ -1,10 +1,12 @@
-name: Build Κοινόχρηστα (Windows και Mac)
+name: Build Κοινόχρηστα (Windows, Mac και server)
 
 # Σε κάθε αλλαγή στο main φτιάχνεται νέα έκδοση 2.2.<αριθμός εκτέλεσης> και ανεβαίνει στα Releases με:
 #   Koinoxrista-Windows-<V>-Setup.exe   (εγκατάσταση ΚΑΙ αυτόματη ενημέρωση στα Windows)
 #   Koinoxrista-Mac-<V>.dmg             (πρώτη εγκατάσταση στο Mac)
 #   Koinoxrista-Mac-<V>.zip             (αυτόματη ενημέρωση στο Mac)
+#   Koinoxrista-Server-<V>.tar.gz       (αυτόματη ενημέρωση του server του σπιτιού)
 #   SHA256SUMS.txt                      (η εφαρμογή ελέγχει ότι κατέβηκαν σωστά)
+# Επίσης ανεβαίνει το image ghcr.io/demelistasos/koinoxrista (για το CasaOS).
 #
 # Το Mac χτίζεται ταυτόχρονα σε δύο είδη Mac του GitHub (Apple Silicon και Intel), γιατί συχνά δεν
 # υπάρχουν διαθέσιμα. Αρκεί να πετύχει ένα. Αν δεν πετύχει κανένα, η έκδοση βγαίνει χωρίς Mac.
@@ -47,7 +49,7 @@ jobs:
       - name: Δοκιμές υπολογισμών
         run: node --test test/calc.test.js
       - name: Έλεγχος σύνταξης
-        run: for f in main.js preload.js updater.js src/*.js; do node --check "$f"; done
+        run: for f in main.js preload.js updater.js src/*.js server/*.js server/public/*.js; do node --check "$f"; done
 
   build-windows:
     needs: test
@@ -105,8 +107,69 @@ jobs:
             dist/Koinoxrista-Mac-*.dmg
             dist/Koinoxrista-Mac-*.zip
 
+  build-server:
+    needs: test
+    if: ${{ !inputs.mac_for_version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Αριθμός έκδοσης
+        run: npm version "$V" --no-git-tag-version --allow-same-version
+      - name: Πακέτο αυτόματης ενημέρωσης
+        run: |
+          mkdir -p dist
+          tar -czf "dist/Koinoxrista-Server-$V.tar.gz" package.json LICENSE.md server src
+          tar -tzf "dist/Koinoxrista-Server-$V.tar.gz" | head -50
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-server
+          if-no-files-found: error
+          path: dist/Koinoxrista-Server-*.tar.gz
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Image για δοκιμή
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: koinoxrista:test
+      - name: Δοκιμή μέσα στο image (σύνδεση, αποθήκευση, PDF)
+        run: |
+          docker run -d --name kx -p 8080:8080 -e AUTO_UPDATE=0 koinoxrista:test
+          for i in $(seq 1 30); do curl -fs localhost:8080/healthz && break; sleep 1; done
+          J='-H Content-Type:application/json -H Origin:http://localhost:8080'
+          curl -fs -c c.txt $J -d '{"name":"Δοκιμή","password":"dokimi123"}' localhost:8080/api/setup
+          curl -fs -b c.txt $J -X PUT -d '{"rev":0,"data":{"buildings":[],"prefs":{}}}' localhost:8080/api/data
+          curl -fs -b c.txt $J -d '{"html":"<html><meta charset=utf-8><body><h1>Κοινόχρηστα 12,34 €</h1></body></html>","fileName":"test","building":"Δοκιμή","subdir":"2026-11"}' localhost:8080/api/pdf | tee r.json
+          URL=$(node -e "console.log(require('./r.json').url)")
+          curl -fs -b c.txt "localhost:8080$URL" -o t.pdf
+          head -c 5 t.pdf | grep -q '%PDF' && echo "PDF εντάξει ($(stat -c %s t.pdf) bytes)"
+          docker logs kx
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Ανέβασμα image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.title=Κοινόχρηστα
+            org.opencontainers.image.licenses=PolyForm-Noncommercial-1.0.0
+          tags: |
+            ghcr.io/demelistasos/koinoxrista:latest
+            ghcr.io/demelistasos/koinoxrista:${{ env.V }}
+
   release:
-    needs: [test, build-windows, build-mac]
+    needs: [test, build-windows, build-mac, build-server]
     if: ${{ always() && !inputs.mac_for_version && needs.test.result == 'success' && needs.build-windows.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
@@ -125,13 +188,15 @@ jobs:
           MACDIR=$(ls -d in/dist-mac-* 2>/dev/null | while read d; do [ -f "$d/Koinoxrista-Mac-$V.zip" ] && echo "$d" && break; done)
           if [ -n "$MACDIR" ]; then cp "$MACDIR/Koinoxrista-Mac-$V.zip" "$MACDIR/Koinoxrista-Mac-$V.dmg" out/; echo "Mac από: $MACDIR"
           else echo "::warning::Δεν χτίστηκε Mac. Τρέξε ξανά με mac_for_version=$V"; fi
+          if [ -f "in/dist-server/Koinoxrista-Server-$V.tar.gz" ]; then cp "in/dist-server/Koinoxrista-Server-$V.tar.gz" out/
+          else echo "::warning::Δεν χτίστηκε ο server"; fi
           (cd out && sha256sum Koinoxrista-* > SHA256SUMS.txt && cat SHA256SUMS.txt)
           gh release create "v$V" out/* \
             --repo "${{ github.repository }}" \
             --title "Κοινόχρηστα $V" \
             --target "${{ github.sha }}" \
             --latest \
-            --notes "**Windows:** Koinoxrista-Windows-$V-Setup.exe · **Mac:** Koinoxrista-Mac-$V.dmg (την πρώτη φορά δεξί κλικ → Άνοιγμα). Αν έχεις ήδη την εφαρμογή (2.2 και μετά), ενημερώνεται μόνη της. Τα στοιχεία σου δεν χάνονται."
+            --notes "**Server (CasaOS):** ενημερώνεται μόνος του. · **Windows:** Koinoxrista-Windows-$V-Setup.exe · **Mac:** Koinoxrista-Mac-$V.dmg (την πρώτη φορά δεξί κλικ → Άνοιγμα). Αν έχεις ήδη την εφαρμογή (2.2 και μετά), ενημερώνεται μόνη της. Τα στοιχεία σου δεν χάνονται."
 
   attach-mac:
     needs: [test, build-mac]
